@@ -61,7 +61,7 @@ export default function EditShoppingItemSheet({
       );
 
       if (alreadyExists) {
-        setDuplicateMessage("Finns redan i handlingslistan");
+        setDuplicateMessage("Finns redan i inköpslistan");
         productSearchRef.current?.closeDropdown({ clearResults: true, focus: true });
         return;
       }
@@ -92,11 +92,11 @@ export default function EditShoppingItemSheet({
             id={`shopping-edit-product-${item.id}`}
             product={product}
             excludedProductIds={excludedProductIds}
-            duplicateMessage="Finns redan i handlingslistan"
+            duplicateMessage="Finns redan i inköpslistan"
             disabled={isSaving}
             placeholder="Välj produkt"
             onDuplicate={() => {
-              setDuplicateMessage("Finns redan i handlingslistan");
+              setDuplicateMessage("Finns redan i inköpslistan");
               setMessage(null);
               productSearchRef.current?.closeDropdown({ clearResults: true, focus: true });
             }}

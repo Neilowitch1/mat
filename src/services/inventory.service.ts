@@ -1,4 +1,8 @@
 import { supabase } from "@/lib/supabase";
+import {
+  mergeCompatibleQuantities,
+  type QuantityWithUnit,
+} from "@/lib/unitConversion";
 import type {
   InventoryItem,
   InventoryLocation,
@@ -17,6 +21,26 @@ export type AddInventoryItemInput = {
 export type AddInventoryItemResult = {
   inventoryItem: InventoryItem;
   alreadyExists: boolean;
+};
+
+export type RefillInventoryItemInput = {
+  productId: string;
+  quantity: number;
+  unit: string;
+  location: InventoryLocation;
+  expiresAt: string | null;
+  replaceIncompatibleUnit?: boolean;
+};
+
+export type RefillInventoryItemResult = {
+  inventoryItem: InventoryItem;
+  created: boolean;
+};
+
+export type InventoryRefillPreview = {
+  existingItem: InventoryItem;
+  result: QuantityWithUnit | null;
+  hasUnitConflict: boolean;
 };
 
 export type UpdateInventoryItemInput = {
@@ -60,9 +84,9 @@ async function getInventoryItemByProductAndLocation(
   return data;
 }
 
-async function getInventoryItemByProduct(
+export async function getInventoryItemsByProduct(
   productId: string
-): Promise<InventoryItem | null> {
+): Promise<InventoryItem[]> {
   const { data, error } = await supabase
     .from("inventory")
     .select(`
@@ -70,13 +94,11 @@ async function getInventoryItemByProduct(
       product:products(*)
     `)
     .eq("product_id", productId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
 
   if (error) throw error;
 
-  return data;
+  return data ?? [];
 }
 
 export async function getInventory(): Promise<InventoryItem[]> {
@@ -166,6 +188,71 @@ export async function addInventoryItem({
   if (error) throw error;
 
   return { inventoryItem: data, alreadyExists: false };
+}
+
+export function getInventoryRefillPreview(
+  existingItem: InventoryItem,
+  quantity: number,
+  unit: string,
+  replaceIncompatibleUnit = false
+): InventoryRefillPreview {
+  const result = mergeCompatibleQuantities(
+    {
+      quantity: existingItem.quantity,
+      unit: existingItem.unit?.trim() || "st",
+    },
+    { quantity, unit }
+  );
+
+  return {
+    existingItem,
+    result: result ?? (replaceIncompatibleUnit ? { quantity, unit } : null),
+    hasUnitConflict: result === null,
+  };
+}
+
+export async function refillInventoryItem({
+  productId,
+  quantity,
+  unit,
+  location,
+  expiresAt,
+  replaceIncompatibleUnit = false,
+}: RefillInventoryItemInput): Promise<RefillInventoryItemResult> {
+  const result = await addInventoryItem({
+    productId,
+    quantity,
+    unit,
+    status: "full",
+    location,
+    expiresAt,
+  });
+
+  if (!result.alreadyExists) {
+    return { inventoryItem: result.inventoryItem, created: true };
+  }
+
+  const preview = getInventoryRefillPreview(
+    result.inventoryItem,
+    quantity,
+    unit,
+    replaceIncompatibleUnit
+  );
+
+  if (!preview.result) {
+    throw new Error("Enheten skiljer sig från den befintliga enheten.");
+  }
+
+  const updated = await updateInventoryItem(result.inventoryItem.id, {
+    productId,
+    quantity: preview.result.quantity,
+    unit: preview.result.unit,
+    status: "full",
+    location,
+    expiresAt: expiresAt ?? result.inventoryItem.expires_at,
+  });
+
+  return { inventoryItem: updated.inventoryItem, created: false };
 }
 
 export async function updateInventoryQuantity(
@@ -274,30 +361,4 @@ export async function updateInventoryExpiration(
   if (error) throw error;
 
   return data;
-}
-
-export async function syncPurchasedProductToInventory(
-  productId: string,
-  defaultUnit: string | null
-): Promise<InventoryItem> {
-  const existingItem = await getInventoryItemByProduct(productId);
-
-  if (existingItem) {
-    return updateInventoryStatus(existingItem.id, "full");
-  }
-
-  const { inventoryItem, alreadyExists } = await addInventoryItem({
-    productId,
-    quantity: 1,
-    unit: defaultUnit || "st",
-    status: "full",
-    location: "pantry",
-    expiresAt: null,
-  });
-
-  if (alreadyExists && inventoryItem.status !== "full") {
-    return updateInventoryStatus(inventoryItem.id, "full");
-  }
-
-  return inventoryItem;
 }

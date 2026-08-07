@@ -2,9 +2,9 @@
 
 ## v1.0 – Klart
 
-### Handla
+### Inköpslista
 
-- [x] Visa den gemensamma handlingslistan
+- [x] Visa den gemensamma inköpslistan
 - [x] Sök bland produkter med autoslutförande
 - [x] Skapa och lägg till produkter
 - [x] Markera produkter som köpta eller inte köpta
@@ -17,7 +17,7 @@
 - [x] Ändra status och mängd direkt i listan
 - [x] Visa och ändra bäst före-datum
 - [x] Visa varningar för produkter som går ut snart eller har gått ut
-- [x] Lägg till produkter med låg eller tom status i Handla
+- [x] Lägg till produkter med halv, låg eller tom status i Inköpslistan
 - [x] Ta bort produkter med optimistisk uppdatering
 
 ### Recept
@@ -26,7 +26,7 @@
 - [x] Skapa, redigera, favoritmarkera och ta bort recept
 - [x] Lägg till, redigera och ta bort ingredienser
 - [x] Visa vilka ingredienser som finns hemma och vilka som saknas
-- [x] Lägg till saknade ingredienser i Handla
+- [x] Lägg till saknade ingredienser i Inköpslistan
 - [x] Rangordna recept efter det som finns hemma
 
 ### Gemensam grund
@@ -34,7 +34,7 @@
 - [x] Supabase som gemensam source of truth utan konto eller lokal persistens
 - [x] Realtime för `shopping_list` och `inventory`
 - [x] Synkning mellan flera öppna klienter
-- [x] Mobilanpassad navigation för Handla, Hemma, Recept och Inställningar
+- [x] Mobilanpassad navigation för Hemma, Inköpslista och Recept
 
 ## Efter v1.0
 

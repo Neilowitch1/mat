@@ -1,10 +1,9 @@
-import { BookOpen, House, Settings, ShoppingCart } from "lucide-react";
+import { BookOpen, House, ShoppingCart } from "lucide-react";
 
 export const navigationItems = [
   { href: "/hemma", icon: House, label: "Hemma" },
-  { href: "/handla", icon: ShoppingCart, label: "Handla" },
+  { href: "/handla", icon: ShoppingCart, label: "Inköpslista" },
   { href: "/recept", icon: BookOpen, label: "Recept" },
-  { href: "/installningar", icon: Settings, label: "Inställningar" },
 ] as const;
 
 export const HomeIcon = House;

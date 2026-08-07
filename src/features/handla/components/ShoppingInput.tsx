@@ -96,7 +96,7 @@ export default function ShoppingInput({
     const { shoppingItem, alreadyExists } = await addToShoppingList(product.id);
 
     if (alreadyExists) {
-      setErrorMessage(`${product.name} finns redan i din handlingslista.`);
+      setErrorMessage(`${product.name} finns redan i din inköpslista.`);
       return;
     }
 
@@ -110,7 +110,7 @@ export default function ShoppingInput({
     if (isSubmitting) return;
 
     if (shoppingProductIds.includes(product.id)) {
-      setErrorMessage(`${product.name} finns redan i din handlingslista.`);
+      setErrorMessage(`${product.name} finns redan i din inköpslista.`);
       return;
     }
 
@@ -142,7 +142,7 @@ export default function ShoppingInput({
   }
 
   return (
-    <div className="relative mb-4">
+    <div className="relative mb-3">
       <Search
         aria-hidden="true"
         size={18}
@@ -170,8 +170,12 @@ export default function ShoppingInput({
         aria-autocomplete="list"
         aria-expanded={showDropdown}
         aria-controls="product-search-results"
-        className="h-13 rounded-[20px] bg-card pl-11 pr-4 text-base"
+        className="h-13 rounded-[20px] bg-card pl-11 pr-12 text-base shadow-[0_5px_18px_rgba(57,62,55,0.045)]"
       />
+
+      <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-primary">
+        <Plus className="size-4" />
+      </span>
 
       {showDropdown && (
         <div

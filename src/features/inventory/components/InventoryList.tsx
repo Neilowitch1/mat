@@ -5,14 +5,20 @@ import { PackageOpen } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
+import { Button } from "@/components/ui/button";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import {
   getInventoryItem,
   removeInventoryItem,
 } from "@/services/inventory.service";
-import type { InventoryItem } from "@/types/database";
+import type { InventoryItem, InventoryLocation } from "@/types/database";
 import AddInventorySheet from "./AddInventorySheet";
 import InventoryItemRow from "./InventoryItemRow";
+import {
+  inventoryLocationIcons,
+  inventoryLocationLabels,
+  inventoryLocations,
+} from "./inventoryFormOptions";
 
 interface InventoryListProps {
   initialInventoryItems: InventoryItem[];
@@ -22,6 +28,7 @@ export default function InventoryList({
   initialInventoryItems,
 }: InventoryListProps) {
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
+  const [locationFilter, setLocationFilter] = useState<InventoryLocation | "all">("all");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<{
@@ -39,9 +46,17 @@ export default function InventoryList({
   }, [router, searchParams]);
 
   function focusInventoryItem(id: string) {
-    const row = document.getElementById(`inventory-item-${id}`);
-    row?.scrollIntoView({ behavior: "smooth", block: "center" });
-    row?.focus({ preventScroll: true });
+    const inventoryItem = inventoryItems.find((item) => item.id === id);
+
+    if (inventoryItem && locationFilter !== "all" && locationFilter !== inventoryItem.location) {
+      setLocationFilter(inventoryItem.location);
+    }
+
+    requestAnimationFrame(() => {
+      const row = document.getElementById(`inventory-item-${id}`);
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+      row?.focus({ preventScroll: true });
+    });
   }
 
   useRealtimeTable("inventory", async (change) => {
@@ -139,6 +154,11 @@ export default function InventoryList({
     }
   }
 
+  const filteredInventoryItems =
+    locationFilter === "all"
+      ? inventoryItems
+      : inventoryItems.filter((item) => item.location === locationFilter);
+
   return (
     <>
       <ListSearchSheet
@@ -173,12 +193,55 @@ export default function InventoryList({
           </div>
         </AppCard>
       ) : (
-        <section aria-labelledby="inventory-heading">
-          <h2 id="inventory-heading" className="mb-2 text-sm font-semibold text-muted-foreground">
-            Hemma
-          </h2>
+        <section aria-label="Produkter hemma">
+          <fieldset className="mb-2.5">
+            <legend className="sr-only">Filtrera produkter efter plats</legend>
+            <div className="grid grid-cols-4 gap-0.5 rounded-[18px] bg-secondary p-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-pressed={locationFilter === "all"}
+                onClick={() => setLocationFilter("all")}
+                className={`h-9 rounded-[14px] px-2 text-xs ${
+                  locationFilter === "all"
+                    ? "bg-card text-primary shadow-sm hover:bg-card"
+                    : "text-muted-foreground hover:bg-card/70"
+                }`}
+              >
+                Alla
+              </Button>
+              {inventoryLocations.map((location) => {
+                const LocationIcon = inventoryLocationIcons[location.value];
+                return (
+                  <Button
+                    key={location.value}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-pressed={locationFilter === location.value}
+                    onClick={() => setLocationFilter(location.value)}
+                    className={`h-9 gap-1 rounded-[14px] px-1.5 text-xs ${
+                      locationFilter === location.value
+                        ? "bg-card text-primary shadow-sm hover:bg-card"
+                        : "text-muted-foreground hover:bg-card/70"
+                    }`}
+                  >
+                    <LocationIcon aria-hidden="true" className="size-3.5" />
+                    {inventoryLocationLabels[location.value]}
+                  </Button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          {filteredInventoryItems.length === 0 ? (
+            <AppCard className="py-6 text-center text-sm text-muted-foreground">
+              Inga produkter på den här platsen.
+            </AppCard>
+          ) : (
           <div className="space-y-2">
-            {inventoryItems.map((item) => (
+            {filteredInventoryItems.map((item) => (
               <div key={item.id} id={`inventory-item-${item.id}`} tabIndex={-1} className="scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
                 <InventoryItemRow
                   item={item}
@@ -194,6 +257,7 @@ export default function InventoryList({
               </div>
             ))}
           </div>
+          )}
         </section>
       )}
 

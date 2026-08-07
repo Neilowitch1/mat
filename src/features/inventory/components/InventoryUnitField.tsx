@@ -32,7 +32,7 @@ export default function InventoryUnitField({
             ? onChange("", true)
             : onChange(event.target.value, false)
         }
-        className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm shadow-[0_4px_14px_rgba(57,62,55,0.035)] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:opacity-50"
+        className="h-11 w-full rounded-xl border border-input bg-card px-3 text-base shadow-[0_4px_14px_rgba(57,62,55,0.035)] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:opacity-50 md:text-sm"
       >
         {inventoryUnits.map((unitOption) => (
           <option key={unitOption} value={unitOption}>{unitOption}</option>

@@ -59,33 +59,33 @@ export default function RecipeIngredientsSection({ recipeId, initialIngredients,
 
   return (
     <>
-      <AppCard>
+      <AppCard className="p-4">
         <section aria-labelledby="ingredient-availability-heading">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 id="ingredient-availability-heading" className="text-base font-semibold text-primary">Ingredienser</h2>
-              {ingredients.length > 0 && (
-                <p className={`mt-1 text-sm font-medium ${missingIngredients.length === 0 ? "text-primary" : "text-[#8a623b]"}`}>
+          <div>
+            <h2 id="ingredient-availability-heading" className="text-base font-semibold text-primary">Ingredienser</h2>
+            {ingredients.length > 0 && (
+              <div className="mt-2">
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${missingIngredients.length === 0 ? "bg-accent text-primary" : "bg-[#f5eadc] text-[#8a623b]"}`}>
                   {missingIngredients.length === 0
                     ? "Du har allt hemma"
                     : `${missingIngredients.length} ${missingIngredients.length === 1 ? "ingrediens saknas" : "ingredienser saknas"}`}
-                </p>
-              )}
-            </div>
+                </span>
+              </div>
+            )}
           </div>
 
           {availability.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">Inga ingredienser har lagts till ännu.</p>
           ) : (
-            <ul className="mt-4 divide-y divide-border">
+            <ul className="mt-3 divide-y divide-border/80">
               {availability.map(({ ingredient, available }) => {
                 const amount = [ingredient.amount, ingredient.unit].filter((value) => value !== null && value !== "").join(" ");
                 return (
-                  <li key={ingredient.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                    <span className={`flex size-7 shrink-0 items-center justify-center rounded-full ${available ? "bg-accent text-primary" : "bg-[#f5e8e6] text-destructive"}`}>
-                      {available ? <Check aria-hidden="true" size={15} strokeWidth={2.5} /> : <X aria-hidden="true" size={15} strokeWidth={2.5} />}
+                  <li key={ingredient.id} className="flex min-w-0 items-center gap-2.5 py-2.5 first:pt-0 last:pb-0">
+                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${available ? "bg-accent text-primary" : "bg-[#f5e8e6] text-destructive"}`}>
+                      {available ? <Check aria-hidden="true" size={13} strokeWidth={2.5} /> : <X aria-hidden="true" size={13} strokeWidth={2.5} />}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-medium">{ingredient.product?.name ?? "Okänd produkt"}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{ingredient.product?.name ?? "Okänd produkt"}</span>
                     <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{amount || "—"}</span>
                   </li>
                 );
@@ -94,22 +94,22 @@ export default function RecipeIngredientsSection({ recipeId, initialIngredients,
           )}
 
           {missingIngredients.length > 0 && (
-            <Button type="button" variant="outline" disabled={isAddingMissing} onClick={() => void addMissingToShoppingList()} className="mt-5 w-full border-border bg-transparent text-primary hover:bg-secondary">
+            <Button type="button" variant="outline" size="sm" disabled={isAddingMissing} onClick={() => void addMissingToShoppingList()} className="mt-4 h-10 w-full rounded-full border-border bg-transparent text-primary hover:bg-secondary">
               <ShoppingCart aria-hidden="true" />
-              {isAddingMissing ? "Lägger till..." : "Lägg till saknade i handlingslistan"}
+              {isAddingMissing ? "Lägger till..." : "Lägg till saknade i inköpslistan"}
             </Button>
           )}
 
           {shoppingFeedback && (
             <p aria-live="polite" className="mt-3 text-sm text-primary">
-              {shoppingFeedback === "added" ? "Tillagda i handlingslistan" : "Alla saknade finns redan i handlingslistan"}
+              {shoppingFeedback === "added" ? "Tillagda i inköpslistan" : "Alla saknade finns redan i inköpslistan"}
             </p>
           )}
           {errorMessage && <p role="alert" className="mt-3 text-sm text-destructive">{errorMessage}</p>}
         </section>
       </AppCard>
 
-      <AppCard>
+      <AppCard className="p-4">
         <RecipeIngredientEditor
           recipeId={recipeId}
           initialIngredients={ingredients}

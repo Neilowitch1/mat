@@ -104,34 +104,33 @@ export default function RecipeIngredientEditor({ recipeId, initialIngredients, o
 
   return (
     <section aria-labelledby="recipe-ingredients-heading">
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-3">
         <h2 id="recipe-ingredients-heading" className="text-base font-semibold text-primary">Redigera ingredienser</h2>
-        <Button type="button" variant="ghost" size="sm" onClick={addDraft} className="rounded-full text-primary">
+        <Button type="button" variant="outline" size="sm" onClick={addDraft} className="mt-2 rounded-full border-border bg-transparent text-primary hover:bg-secondary">
           <Plus aria-hidden="true" />
-          Lägg till
+          Lägg till ingrediens
         </Button>
       </div>
 
       {ingredients.length === 0 ? (
         <p className="rounded-[18px] bg-secondary px-4 py-3 text-sm text-muted-foreground">Inga ingredienser har lagts till ännu.</p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {ingredients.map((ingredient) => (
-            <div key={ingredient.key}>
-              <IngredientDraftRow
-                draft={ingredient}
-                excludedProductIds={ingredients.filter((candidate) => candidate.key !== ingredient.key).map((candidate) => candidate.product?.id).filter((id): id is string => Boolean(id))}
-                disabled={Boolean(savingKey)}
-                onChange={(draft) => setIngredients((current) => current.map((candidate) => candidate.key === ingredient.key ? { ...candidate, ...draft } : candidate))}
-                onDelete={() => void removeIngredient(ingredient)}
-              />
-              <div className="mt-1.5 flex justify-end">
+            <IngredientDraftRow
+              key={ingredient.key}
+              draft={ingredient}
+              excludedProductIds={ingredients.filter((candidate) => candidate.key !== ingredient.key).map((candidate) => candidate.product?.id).filter((id): id is string => Boolean(id))}
+              disabled={Boolean(savingKey)}
+              onChange={(draft) => setIngredients((current) => current.map((candidate) => candidate.key === ingredient.key ? { ...candidate, ...draft } : candidate))}
+              onDelete={() => void removeIngredient(ingredient)}
+              headerAction={
                 <Button type="button" variant="ghost" size="sm" disabled={Boolean(savingKey)} onClick={() => void saveIngredient(ingredient)} className="rounded-full text-primary">
                   {savedKey === ingredient.key ? <Check aria-hidden="true" /> : <Save aria-hidden="true" />}
                   {savingKey === ingredient.key ? "Sparar..." : savedKey === ingredient.key ? "Sparad" : "Spara"}
                 </Button>
-              </div>
-            </div>
+              }
+            />
           ))}
         </div>
       )}

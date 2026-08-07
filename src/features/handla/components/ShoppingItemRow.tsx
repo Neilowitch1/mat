@@ -29,14 +29,14 @@ export default function ShoppingItemRow({
 
   return (
     <li id={`shopping-item-${item.id}`} tabIndex={-1} className="scroll-mt-24 rounded-2xl first:pt-0 last:pb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         <button
           type="button"
           onClick={() => onToggle(item)}
           disabled={disabled}
-          className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-4 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-wait ${
+          className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-wait ${
             item.completed
-              ? "text-muted-foreground/60"
+              ? "text-muted-foreground/55"
               : "text-foreground hover:bg-accent"
           }`}
         >
@@ -52,12 +52,17 @@ export default function ShoppingItemRow({
           </span>
           <div className="min-w-0">
             <p
-              className={`truncate text-[1.0625rem] font-medium ${
+              className={`truncate text-[1.0625rem] font-semibold tracking-[-0.01em] ${
                 item.completed ? "line-through" : ""
               }`}
             >
               {item.product?.name ?? "Okänd produkt"}
             </p>
+            {item.completed && (
+              <p className="mt-0.5 truncate text-xs font-normal text-muted-foreground/80 no-underline">
+                Tryck igen för att lägga hemma
+              </p>
+            )}
           </div>
         </button>
 
@@ -68,9 +73,9 @@ export default function ShoppingItemRow({
           disabled={disabled}
           onClick={() => setIsEditOpen(true)}
           aria-label={`Redigera ${item.product?.name ?? "produkt"}`}
-          className="shrink-0 rounded-xl text-muted-foreground hover:bg-secondary hover:text-primary"
+          className="shrink-0 rounded-xl text-muted-foreground/60 hover:bg-secondary hover:text-primary"
         >
-          <Pencil aria-hidden="true" />
+          <Pencil aria-hidden="true" className="size-4" />
         </Button>
 
         <Button
@@ -79,10 +84,10 @@ export default function ShoppingItemRow({
           size="icon"
           disabled={disabled}
           onClick={() => onDelete(item)}
-          aria-label={`Ta bort ${item.product?.name ?? "produkt"} från handlingslistan`}
-          className="shrink-0 rounded-xl text-muted-foreground hover:bg-[#f5e8e6] hover:text-destructive"
+          aria-label={`Ta bort ${item.product?.name ?? "produkt"} från inköpslistan`}
+          className="shrink-0 rounded-xl text-muted-foreground/60 hover:bg-[#f5e8e6] hover:text-destructive"
         >
-          <Trash2 aria-hidden="true" />
+          <Trash2 aria-hidden="true" className="size-4" />
         </Button>
       </div>
 

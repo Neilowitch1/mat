@@ -11,7 +11,7 @@ export default async function HemmaPage() {
 
   return (
     <>
-      <AppHeader title="Hemma" subtitle="Det här har du hemma" searchHref="/hemma?search=1" icon={HomeIcon} />
+      <AppHeader title="Hemma" subtitle="Det här har du hemma" searchHref="/hemma?search=1" icon={HomeIcon} className="mb-4" />
       <InventoryList initialInventoryItems={inventoryItems} />
     </>
   );

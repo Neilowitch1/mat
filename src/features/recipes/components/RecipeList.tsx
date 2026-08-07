@@ -27,7 +27,11 @@ export default function RecipeList({ initialRecipes, initialInventoryItems }: Re
   const router = useRouter();
   const searchParams = useSearchParams();
   const inventoryVersion = useRef(0);
-  const suggestions = rankRecipeSuggestions(recipes, inventoryItems).slice(0, 5);
+  const rankedSuggestions = rankRecipeSuggestions(recipes, inventoryItems);
+  const suggestions = rankedSuggestions.slice(0, 5);
+  const availabilityByRecipeId = new Map(
+    rankedSuggestions.map((suggestion) => [suggestion.recipe.id, suggestion])
+  );
 
   useRealtimeTable("inventory", async () => {
     const version = ++inventoryVersion.current;
@@ -87,14 +91,14 @@ export default function RecipeList({ initialRecipes, initialInventoryItems }: Re
           </div>
         </AppCard>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {suggestions.length > 0 && (
-            <section aria-labelledby="recipe-suggestions-heading">
-              <div className="mb-3">
+            <section aria-labelledby="recipe-suggestions-heading" className="rounded-[26px] border border-[#eadfce] bg-[#f5efe7] p-3.5">
+              <div className="mb-2.5 px-0.5">
                 <h2 id="recipe-suggestions-heading" className="text-base font-semibold text-primary">Passar bäst just nu</h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">Baserat på det du har hemma</p>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {suggestions.map((suggestion) => (
                   <RecipeSuggestionCard key={suggestion.recipe.id} suggestion={suggestion} />
                 ))}
@@ -103,8 +107,8 @@ export default function RecipeList({ initialRecipes, initialInventoryItems }: Re
           )}
 
           <section aria-labelledby="recipe-list-heading">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 id="recipe-list-heading" className="text-sm font-semibold text-muted-foreground">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 id="recipe-list-heading" className="text-base font-semibold text-primary">
               Dina recept
             </h2>
             <Button type="button" variant="ghost" size="sm" onClick={() => setIsCreateOpen(true)} className="rounded-full text-primary">
@@ -113,10 +117,13 @@ export default function RecipeList({ initialRecipes, initialInventoryItems }: Re
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {recipes.map((recipe) => (
+          <div className="space-y-2.5">
+            {recipes.map((recipe) => {
+              const availability = availabilityByRecipeId.get(recipe.id);
+
+              return (
               <Link key={recipe.id} href={`/recept/${recipe.id}`} className="block rounded-[24px] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/20">
-                <AppCard>
+                <AppCard className="p-4 transition-colors hover:bg-secondary/30">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="truncate text-[1.0625rem] font-semibold tracking-[-0.01em]">
@@ -129,27 +136,49 @@ export default function RecipeList({ initialRecipes, initialInventoryItems }: Re
                       )}
                     </div>
                     {recipe.favorite && (
-                      <span aria-label="Favorit" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#eee7f4] text-[#7c5e9e]">
-                        <Heart aria-hidden="true" className="fill-current" size={15} />
+                      <span aria-label="Favorit" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#eee7f4] text-[#7c5e9e]">
+                        <Heart aria-hidden="true" className="fill-current" size={14} />
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1.5">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
                       <Users aria-hidden="true" size={14} />
                       {recipe.servings} portioner
                     </span>
                     {recipe.prep_time_minutes !== null && (
-                      <span className="flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1.5">
-                        <Clock aria-hidden="true" size={14} />
-                        {recipe.prep_time_minutes} min
-                      </span>
+                      <>
+                        <span aria-hidden="true" className="text-border">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Clock aria-hidden="true" size={14} />
+                          {recipe.prep_time_minutes} min
+                        </span>
+                      </>
                     )}
                   </div>
+
+                  {availability && (
+                    <div className="mt-2.5">
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className={availability.missingIngredients === 0 ? "font-medium text-primary" : "text-muted-foreground"}>
+                          {availability.missingIngredients === 0
+                            ? "Du har allt hemma"
+                            : `${availability.availableIngredients} av ${availability.totalIngredients} ingredienser hemma`}
+                        </span>
+                        {availability.missingIngredients > 0 && (
+                          <span className="shrink-0 text-muted-foreground">{availability.missingIngredients} saknas</span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Ingredienser hemma" aria-valuemin={0} aria-valuemax={100} aria-valuenow={availability.matchPercentage}>
+                        <div className="h-full rounded-full bg-primary/70" style={{ width: `${availability.matchPercentage}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </AppCard>
               </Link>
-            ))}
+              );
+            })}
           </div>
           </section>
         </div>

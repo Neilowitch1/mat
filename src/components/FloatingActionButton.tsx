@@ -3,6 +3,7 @@
 import { BookOpen, ChevronRight, Package, Plus, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { floatingActionButtonClassName } from "./floatingActionButtonStyles";
 import {
   Sheet,
   SheetClose,
@@ -25,7 +26,7 @@ export default function FloatingActionButton() {
           <button
             type="button"
             aria-label="Lägg till"
-            className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 z-40 ml-[calc(min(50vw,224px)-50px)] flex size-[60px] items-center justify-center rounded-full bg-primary text-white shadow-[0_10px_28px_rgba(66,91,72,0.3)] transition hover:bg-[#425b48] active:scale-95"
+            className={floatingActionButtonClassName}
           />
         }
       >
@@ -39,7 +40,7 @@ export default function FloatingActionButton() {
         </SheetHeader>
 
         <div className="flex flex-col gap-2">
-          <Action href="/handla?add=1" icon={ShoppingCart} title="Lägg till i Handla" subtitle="Sök eller skapa en produkt" />
+          <Action href="/handla?add=1" icon={ShoppingCart} title="Lägg till i inköpslistan" subtitle="Lägg till en vara i inköpslistan." />
           <Action href="/hemma?add=1" icon={Package} title="Lägg till hemma" subtitle="Välj plats, mängd och datum" />
           <Action href="/recept?add=1" icon={BookOpen} title="Nytt recept" subtitle="Spara ett nytt favoritrecept" />
         </div>

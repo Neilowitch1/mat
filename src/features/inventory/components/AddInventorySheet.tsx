@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { floatingActionButtonClassName } from "@/components/floatingActionButtonStyles";
 import {
   Sheet,
   SheetContent,
@@ -13,17 +14,25 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { addInventoryItem } from "@/services/inventory.service";
+import {
+  addInventoryItem,
+  getInventoryItemsByProduct,
+  getInventoryRefillPreview,
+  refillInventoryItem,
+} from "@/services/inventory.service";
+import { formatConvertedQuantity } from "@/lib/unitConversion";
 import { createProduct, searchProducts } from "@/services/products.service";
 import type {
   InventoryItem,
   InventoryLocation,
+  InventoryStatus,
   Product,
 } from "@/types/database";
 import InventoryUnitField from "./InventoryUnitField";
 import {
   inventoryLocationLabels,
   inventoryLocations,
+  inventoryStatuses,
   inventoryUnits,
 } from "./inventoryFormOptions";
 
@@ -37,7 +46,12 @@ type SearchResult = {
 };
 
 interface AddInventorySheetProps {
-  onInventoryItemAdded: (inventoryItem: InventoryItem) => void;
+  onInventoryItemAdded?: (inventoryItem: InventoryItem) => void;
+  preselectedProduct?: Product;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onInventoryItemSaved?: (inventoryItem: InventoryItem) => void | Promise<void>;
+  mode?: "add" | "put-away";
 }
 
 function getErrorMessage(error: unknown): string {
@@ -63,21 +77,39 @@ function getErrorMessage(error: unknown): string {
 
 export default function AddInventorySheet({
   onInventoryItemAdded,
+  preselectedProduct,
+  open: controlledOpen,
+  onOpenChange,
+  onInventoryItemSaved,
+  mode = "add",
 }: AddInventorySheetProps) {
+  const preselectedUnit = preselectedProduct?.default_unit?.trim() || "st";
   const searchInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(preselectedProduct?.name ?? "");
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
-  const [selection, setSelection] = useState<ProductSelection | null>(null);
+  const [selection, setSelection] = useState<ProductSelection | null>(
+    preselectedProduct ? { kind: "existing", product: preselectedProduct } : null
+  );
   const [location, setLocation] = useState<InventoryLocation>("pantry");
+  const [status, setStatus] = useState<InventoryStatus>("full");
   const [quantity, setQuantity] = useState("1");
-  const [unit, setUnit] = useState("st");
-  const [isCustomUnit, setIsCustomUnit] = useState(false);
+  const [unit, setUnit] = useState(preselectedUnit);
+  const [isCustomUnit, setIsCustomUnit] = useState(
+    !inventoryUnits.includes(preselectedUnit)
+  );
   const [expiresAt, setExpiresAt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(
+    mode === "put-away" && Boolean(preselectedProduct)
+  );
+  const [existingItems, setExistingItems] = useState<InventoryItem[]>([]);
+  const [replaceIncompatibleUnit, setReplaceIncompatibleUnit] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const sheetOpen = controlledOpen ?? isOpen;
+  const isPutAway = mode === "put-away";
 
   const trimmedQuery = query.trim();
   const canSearch = trimmedQuery.length >= 2 && !selection;
@@ -88,6 +120,24 @@ export default function AddInventorySheet({
   const hasExactMatch = products.some(
     (product) => product.name.toLocaleLowerCase("sv") === trimmedQuery.toLocaleLowerCase("sv")
   );
+  const parsedPreviewQuantity = Number(quantity);
+  const existingItem = existingItems.find((item) => item.location === location) ?? null;
+  const refillPreview =
+    isPutAway &&
+    existingItem &&
+    Number.isFinite(parsedPreviewQuantity) &&
+    parsedPreviewQuantity > 0 &&
+    unit.trim()
+      ? getInventoryRefillPreview(
+          existingItem,
+          parsedPreviewQuantity,
+          unit.trim(),
+          replaceIncompatibleUnit
+        )
+      : null;
+  const hasUnresolvedUnitConflict = Boolean(
+    refillPreview?.hasUnitConflict && !replaceIncompatibleUnit
+  );
 
   useEffect(() => {
     if (searchParams.get("add") !== "1") return;
@@ -96,10 +146,33 @@ export default function AddInventorySheet({
   }, [router, searchParams]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!sheetOpen || preselectedProduct) return;
     const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
-  }, [isOpen]);
+  }, [preselectedProduct, sheetOpen]);
+
+  useEffect(() => {
+    if (!isPutAway || !sheetOpen || !preselectedProduct) return;
+
+    let isCurrentRequest = true;
+    void getInventoryItemsByProduct(preselectedProduct.id)
+      .then((items) => {
+        if (isCurrentRequest) setExistingItems(items);
+      })
+      .catch(() => {
+        if (isCurrentRequest) {
+          setExistingItems([]);
+          setErrorMessage("Kunde inte kontrollera vad som redan finns hemma.");
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setIsLoadingInventory(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [isPutAway, preselectedProduct, sheetOpen]);
 
   useEffect(() => {
     if (!canSearch) return;
@@ -131,10 +204,13 @@ export default function AddInventorySheet({
     setSearchResult(null);
     setSelection(null);
     setLocation("pantry");
+    setStatus("full");
     setQuantity("1");
     setUnit("st");
     setIsCustomUnit(false);
     setExpiresAt("");
+    setExistingItems([]);
+    setReplaceIncompatibleUnit(false);
     setErrorMessage(null);
   }
 
@@ -181,24 +257,37 @@ export default function AddInventorySheet({
       const product = selection.kind === "existing"
         ? selection.product
         : await createProduct(selection.name);
-      const { inventoryItem, alreadyExists } = await addInventoryItem({
+      const input = {
         productId: product.id,
         quantity: parsedQuantity,
         unit: unit.trim(),
-        status: "full",
         location,
         expiresAt: expiresAt || null,
-      });
+      };
+      let inventoryItem: InventoryItem;
 
-      if (alreadyExists) {
-        setErrorMessage(
-          `${product.name} finns redan i ${inventoryLocationLabels[location].toLocaleLowerCase("sv")}.`
-        );
-        return;
+      if (isPutAway) {
+        inventoryItem = (await refillInventoryItem({
+          ...input,
+          replaceIncompatibleUnit,
+        })).inventoryItem;
+      } else {
+        const result = await addInventoryItem({ ...input, status });
+
+        if (result.alreadyExists) {
+          setErrorMessage(
+            `${product.name} finns redan i ${inventoryLocationLabels[location].toLocaleLowerCase("sv")}.`
+          );
+          return;
+        }
+
+        inventoryItem = result.inventoryItem;
       }
 
-      onInventoryItemAdded(inventoryItem);
+      onInventoryItemAdded?.(inventoryItem);
+      await onInventoryItemSaved?.(inventoryItem);
       setIsOpen(false);
+      onOpenChange?.(false);
       resetForm();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -209,32 +298,44 @@ export default function AddInventorySheet({
 
   return (
     <Sheet
-      open={isOpen}
+      open={sheetOpen}
       onOpenChange={(open) => {
         setIsOpen(open);
+        onOpenChange?.(open);
         if (!open && !isSubmitting) resetForm();
       }}
     >
-      <SheetTrigger
+      {!isPutAway && <SheetTrigger
         render={
           <button
             type="button"
             aria-label="Lägg till hemma"
-            className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 z-40 ml-[calc(min(50vw,224px)-50px)] flex size-[60px] items-center justify-center rounded-full bg-primary text-white shadow-[0_10px_28px_rgba(66,91,72,0.3)] transition hover:bg-[#425b48] active:scale-95"
+            className={floatingActionButtonClassName}
           />
         }
       >
         <Plus aria-hidden="true" size={30} />
-      </SheetTrigger>
+      </SheetTrigger>}
 
       <SheetContent side="bottom" className="mx-auto max-h-[92dvh] max-w-md">
         <SheetHeader className="px-5 pt-5">
-          <SheetTitle className="text-lg">Lägg till hemma</SheetTitle>
-          <SheetDescription>Välj produkt, plats och mängd.</SheetDescription>
+          <SheetTitle className="text-lg">{isPutAway ? "Lägg in hemma" : "Lägg till hemma"}</SheetTitle>
+          <SheetDescription>
+            {isPutAway
+              ? "Välj var du vill lägga varan och hur mycket du har."
+              : "Välj produkt, plats och mängd."}
+          </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto px-5 pb-6">
-          <div className="relative">
+          {isPutAway && preselectedProduct ? (
+            <div>
+              <span className="mb-2 block text-sm font-medium">Produkt</span>
+              <div className="rounded-[18px] border border-border bg-secondary px-4 py-3 font-semibold text-foreground">
+                {preselectedProduct.name}
+              </div>
+            </div>
+          ) : <div className="relative">
             <label htmlFor="inventory-product" className="mb-2 block text-sm font-medium">
               Produkt
             </label>
@@ -256,9 +357,9 @@ export default function AddInventorySheet({
               autoComplete="off"
               className="pl-10"
             />
-          </div>
+          </div>}
 
-          {canSearch && (
+          {!isPutAway && canSearch && (
             <div className="mt-2 max-h-48 overflow-y-auto rounded-[20px] border bg-card p-1.5 shadow-sm">
               {isSearching ? (
                 <p className="px-3 py-2 text-sm text-muted-foreground">Söker...</p>
@@ -294,7 +395,7 @@ export default function AddInventorySheet({
             </div>
           )}
 
-          {selection && (
+          {!isPutAway && selection && (
             <p className="mt-2 text-sm text-[#425b48]">
               {selection.kind === "new" ? "Ny produkt" : "Vald produkt"}: {query}
             </p>
@@ -308,7 +409,10 @@ export default function AddInventorySheet({
                   key={option.value}
                   type="button"
                   variant={location === option.value ? "default" : "outline"}
-                  onClick={() => setLocation(option.value)}
+                  onClick={() => {
+                    setLocation(option.value);
+                    setReplaceIncompatibleUnit(false);
+                  }}
                   className="h-10 rounded-xl"
                 >
                   {option.label}
@@ -316,6 +420,37 @@ export default function AddInventorySheet({
               ))}
             </div>
           </fieldset>
+
+          {!isPutAway && (
+            <fieldset className="mt-5">
+              <legend className="mb-2 text-sm font-medium">Status</legend>
+              <div className="flex gap-1 overflow-x-auto rounded-full bg-secondary/60 p-1">
+                {inventoryStatuses.map((option) => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-pressed={status === option.value}
+                    onClick={() => setStatus(option.value)}
+                    className={`h-8 shrink-0 rounded-full px-2.5 text-xs ${
+                      status === option.value
+                        ? "bg-card text-primary shadow-sm hover:bg-card"
+                        : "text-muted-foreground hover:bg-card/60"
+                    }`}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          {isPutAway && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Status efter sparande: <span className="font-medium text-primary">Full</span>
+            </p>
+          )}
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <div>
@@ -341,10 +476,91 @@ export default function AddInventorySheet({
                 onChange={(nextUnit, nextIsCustomUnit) => {
                   setUnit(nextUnit);
                   setIsCustomUnit(nextIsCustomUnit);
+                  setReplaceIncompatibleUnit(false);
                 }}
               />
             </div>
           </div>
+
+          {isPutAway && isLoadingInventory && (
+            <p className="mt-3 text-sm text-muted-foreground">Kontrollerar vad du har hemma...</p>
+          )}
+
+          {isPutAway && existingItem && refillPreview && (
+            <div className="mt-4 rounded-[20px] border border-border bg-secondary px-4 py-3">
+              <p className="font-semibold text-foreground">
+                {preselectedProduct?.name} finns redan hemma
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {inventoryLocationLabels[location]}
+              </p>
+
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-xs text-muted-foreground">Nu</dt>
+                  <dd className="text-right font-medium">
+                    {formatConvertedQuantity({
+                      quantity: existingItem.quantity,
+                      unit: existingItem.unit?.trim() || "st",
+                    })} · {inventoryStatuses.find((option) => option.value === existingItem.status)?.label}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-xs text-muted-foreground">Du lägger till</dt>
+                  <dd className="text-right font-medium">
+                    {formatConvertedQuantity({
+                      quantity: parsedPreviewQuantity,
+                      unit: unit.trim(),
+                    })}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
+                  <dt className="text-xs text-muted-foreground">Efter sparande</dt>
+                  <dd className="text-right font-semibold text-primary">
+                    {refillPreview.result
+                      ? formatConvertedQuantity(refillPreview.result)
+                      : "Välj enhet"} · Full
+                  </dd>
+                </div>
+              </dl>
+
+              {existingItem.expires_at && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Nuvarande bäst före: {existingItem.expires_at}
+                </p>
+              )}
+            </div>
+          )}
+
+          {hasUnresolvedUnitConflict && existingItem && (
+            <div role="alertdialog" aria-labelledby="unit-conflict-title" className="mt-3 rounded-[20px] border border-[#eadfce] bg-[#f5efe7] p-4">
+              <h3 id="unit-conflict-title" className="font-semibold text-foreground">Enheten skiljer sig</h3>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {preselectedProduct?.name} finns redan hemma som {formatConvertedQuantity({ quantity: existingItem.quantity, unit: existingItem.unit?.trim() || "st" })}, men den nya varan anges som {formatConvertedQuantity({ quantity: parsedPreviewQuantity, unit: unit.trim() })}.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const existingUnit = existingItem.unit?.trim() || "st";
+                    setUnit(existingUnit);
+                    setIsCustomUnit(!inventoryUnits.includes(existingUnit));
+                    setReplaceIncompatibleUnit(false);
+                  }}
+                >
+                  Behåll befintlig enhet
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setReplaceIncompatibleUnit(true)}>
+                  Byt till ny enhet
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange?.(false)}>
+                  Avbryt
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-5">
             <label htmlFor="inventory-expires-at" className="mb-2 block text-sm font-medium">
@@ -367,10 +583,10 @@ export default function AddInventorySheet({
 
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingInventory || hasUnresolvedUnitConflict}
             className="mt-5 h-12 w-full rounded-2xl text-base"
           >
-            {isSubmitting ? "Lägger till..." : "Lägg till hemma"}
+            {isSubmitting ? "Sparar..." : isPutAway ? "Spara hemma" : "Lägg till hemma"}
           </Button>
         </form>
       </SheetContent>

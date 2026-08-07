@@ -19,7 +19,7 @@ export default async function RecipeDetailPage({ params }: RecipeDetailPageProps
 
   return (
     <>
-      <Link href="/recept" className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary">
+      <Link href="/recept" className="mb-3 inline-flex min-h-10 items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary">
         <ChevronLeft aria-hidden="true" size={17} />
         Alla recept
       </Link>

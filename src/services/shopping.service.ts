@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import { syncPurchasedProductToInventory } from "@/services/inventory.service";
 import type { ShoppingItem } from "@/types/database";
 
 export async function getShoppingList(): Promise<ShoppingItem[]> {
@@ -96,7 +95,7 @@ export async function addToShoppingList(
   if (error) throw error;
 
   if (!data) {
-    throw new Error("Kunde inte lägga till produkten i handlingslistan.");
+    throw new Error("Kunde inte lägga till produkten i inköpslistan.");
   }
 
   return { shoppingItem: data, alreadyExists: false };
@@ -111,24 +110,6 @@ export async function removeShoppingItem(id: string) {
   if (error) throw error;
 }
 
-export type ToggleShoppingItemCompletedResult = {
-  shoppingItem: ShoppingItem;
-  inventorySyncError: string | null;
-};
-
-function getErrorMessage(error: unknown): string {
-  if (
-    error &&
-    typeof error === "object" &&
-    "message" in error &&
-    typeof error.message === "string"
-  ) {
-    return error.message;
-  }
-
-  return "Okänt fel";
-}
-
 export async function updateShoppingItemProduct(
   id: string,
   productId: string
@@ -137,7 +118,7 @@ export async function updateShoppingItemProduct(
 
   if (existingItem && existingItem.id !== id) {
     const currentItem = await getShoppingItem(id);
-    if (!currentItem) throw new Error("Produkten finns inte längre i handlingslistan.");
+    if (!currentItem) throw new Error("Produkten finns inte längre i inköpslistan.");
     return { shoppingItem: currentItem, alreadyExists: true };
   }
 
@@ -165,7 +146,7 @@ export async function updateShoppingItemProduct(
 export async function toggleShoppingItemCompleted(
   id: string,
   completed: boolean
-): Promise<ToggleShoppingItemCompletedResult> {
+): Promise<ShoppingItem> {
   const { data, error } = await supabase
     .from("shopping_list")
     .update({ completed })
@@ -182,21 +163,5 @@ export async function toggleShoppingItemCompleted(
     throw new Error("Kunde inte uppdatera produkten.");
   }
 
-  if (!completed) {
-    return { shoppingItem: data, inventorySyncError: null };
-  }
-
-  try {
-    await syncPurchasedProductToInventory(
-      data.product_id,
-      data.product?.default_unit ?? null
-    );
-
-    return { shoppingItem: data, inventorySyncError: null };
-  } catch (inventoryError) {
-    return {
-      shoppingItem: data,
-      inventorySyncError: `Köpet sparades, men Hemma kunde inte uppdateras: ${getErrorMessage(inventoryError)}`,
-    };
-  }
+  return data;
 }

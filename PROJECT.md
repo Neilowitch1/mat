@@ -36,7 +36,7 @@ Appen har inga användarkonton eller inloggning. Alla enheter som använder samm
 
 ## Funktioner
 
-### Handla
+### Inköpslista
 
 - Shoppinglista
 - Smarta produktförslag
@@ -51,7 +51,7 @@ Appen har inga användarkonton eller inloggning. Alla enheter som använder samm
   - Lite kvar
   - Slut
 
-När status blir "Slut" ska produkten automatiskt kunna föreslås till handlingslistan.
+När status blir "Slut" ska produkten automatiskt kunna föreslås till inköpslistan.
 
 ### Recept
 

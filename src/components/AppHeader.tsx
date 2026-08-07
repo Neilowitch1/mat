@@ -1,11 +1,13 @@
 import { Search, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
   title: string;
   subtitle?: string;
   searchHref?: string;
   icon?: LucideIcon;
+  className?: string;
 }
 
 export default function AppHeader({
@@ -13,9 +15,10 @@ export default function AppHeader({
   subtitle,
   searchHref,
   icon: Icon,
+  className,
 }: AppHeaderProps) {
   return (
-    <header className="mb-5">
+    <header className={cn("mb-5", className)}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {Icon && (

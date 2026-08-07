@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Heart, ShoppingCart } from "lucide-react";
+import { Check, Clock, Heart, ShoppingCart, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import AppCard from "@/components/AppCard";
@@ -39,41 +39,54 @@ export default function RecipeSuggestionCard({ suggestion }: RecipeSuggestionCar
   }
 
   return (
-    <AppCard>
+    <AppCard className="p-4 shadow-[0_6px_18px_rgba(91,70,48,0.045)]">
       <Link href={`/recept/${recipe.id}`} className="block rounded-2xl focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/20">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate text-[1.0625rem] font-semibold tracking-[-0.01em]">{recipe.name}</h3>
-            {missingIngredients === 0 ? (
-              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-primary">
-                <Check aria-hidden="true" size={13} />
-                Du har allt hemma
-              </span>
-            ) : isAlmostReady ? (
-              <div className="mt-1">
-                <p className="text-sm font-medium text-[#8a623b]">Nästan redo</p>
-                <p className="text-xs text-muted-foreground">{availableIngredients} av {totalIngredients} ingredienser hemma</p>
-              </div>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">{availableIngredients} av {totalIngredients} ingredienser hemma</p>
+            {recipe.description && (
+              <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                {recipe.description}
+              </p>
             )}
           </div>
           {recipe.favorite && (
-            <span aria-label="Favorit" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#eee7f4] text-[#7c5e9e]">
-              <Heart aria-hidden="true" className="fill-current" size={15} />
+            <span aria-label="Favorit" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#eee7f4] text-[#7c5e9e]">
+              <Heart aria-hidden="true" className="fill-current" size={14} />
             </span>
           )}
         </div>
 
-        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Ingredienser hemma" aria-valuemin={0} aria-valuemax={100} aria-valuenow={matchPercentage}>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5"><Users aria-hidden="true" size={14} />{recipe.servings} portioner</span>
+          {recipe.prep_time_minutes !== null && (
+            <>
+              <span aria-hidden="true" className="text-border">•</span>
+              <span className="flex items-center gap-1.5"><Clock aria-hidden="true" size={14} />{recipe.prep_time_minutes} min</span>
+            </>
+          )}
+        </div>
+
+        <div className="mt-2.5 flex items-center justify-between gap-3 text-xs">
+          {missingIngredients === 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 font-medium text-primary">
+              <Check aria-hidden="true" size={13} />Du har allt hemma
+            </span>
+          ) : isAlmostReady ? (
+            <span className="font-medium text-[#8a623b]">Nästan redo</span>
+          ) : (
+            <span className="text-muted-foreground">{availableIngredients} av {totalIngredients} ingredienser hemma</span>
+          )}
+          {missingIngredients > 0 && <span className="shrink-0 text-muted-foreground">{missingIngredients} saknas</span>}
+        </div>
+
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-label="Ingredienser hemma" aria-valuemin={0} aria-valuemax={100} aria-valuenow={matchPercentage}>
           <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${matchPercentage}%` }} />
         </div>
 
-        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
           <span>{matchPercentage}% matchning</span>
-          {missingIngredients > 0 ? (
-            <span className={isAlmostReady ? "font-medium text-[#8a623b]" : ""}>{missingIngredients} saknas</span>
-          ) : (
+          {missingIngredients === 0 && (
             <span className="flex items-center gap-1 text-primary"><Check aria-hidden="true" size={13} />Redo att laga</span>
           )}
         </div>
@@ -88,7 +101,7 @@ export default function RecipeSuggestionCard({ suggestion }: RecipeSuggestionCar
 
       {feedback && (
         <p aria-live="polite" className="mt-2 text-xs text-primary">
-          {feedback === "added" ? "Tillagda i handlingslistan" : "Finns redan i handlingslistan"}
+          {feedback === "added" ? "Tillagda i inköpslistan" : "Finns redan i inköpslistan"}
         </p>
       )}
       {errorMessage && <p role="alert" className="mt-2 text-xs text-destructive">{errorMessage}</p>}

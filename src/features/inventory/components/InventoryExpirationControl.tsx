@@ -108,7 +108,7 @@ export default function InventoryExpirationControl({
   }
 
   return (
-    <div className="mt-1">
+    <div className="min-w-0">
       <Sheet
         open={isOpen}
         onOpenChange={(open) => {
@@ -123,7 +123,7 @@ export default function InventoryExpirationControl({
               variant="ghost"
               size="sm"
               disabled={isUpdating}
-              className={`h-auto min-h-[30px] rounded-full px-2.5 py-1 text-xs font-normal ${
+              className={`h-auto min-h-[30px] max-w-full rounded-full px-2.5 py-1 text-xs font-normal ${
                 expirationStyle?.className ?? "text-muted-foreground"
               }`}
             />
@@ -134,7 +134,7 @@ export default function InventoryExpirationControl({
           ) : (
             <CalendarPlus aria-hidden="true" />
           )}
-          <span>
+          <span className="truncate">
             {item.expires_at ? `Bäst före ${item.expires_at}` : "Lägg till bäst före"}
           </span>
           {expirationStyle?.label && (

@@ -156,7 +156,7 @@ När status blir "Slut"
 
 Föreslå:
 
-"Lägg till på handlingslistan"
+"Lägg till på inköpslistan"
 
 ---
 
@@ -208,7 +208,7 @@ Mycket whitespace.
 ## AI
 
 - Receptförslag.
-- Smart handlingslista.
+- Smart inköpslista.
 - Matsvinn.
 - Måltidsplanering.
 

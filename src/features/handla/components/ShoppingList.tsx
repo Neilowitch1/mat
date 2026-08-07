@@ -12,6 +12,7 @@ import {
   toggleShoppingItemCompleted,
 } from "@/services/shopping.service";
 import type { ShoppingItem } from "@/types/database";
+import AddInventorySheet from "@/features/inventory/components/AddInventorySheet";
 import ShoppingInput from "./ShoppingInput";
 import ShoppingItemRow from "./ShoppingItemRow";
 
@@ -24,6 +25,7 @@ export default function ShoppingList({
 }: ShoppingListProps) {
   const [shoppingItems, setShoppingItems] = useState(initialShoppingItems);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [putAwayItem, setPutAwayItem] = useState<ShoppingItem | null>(null);
   const [togglingItemId, setTogglingItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [error, setError] = useState<{ itemId: string; message: string } | null>(
@@ -109,7 +111,21 @@ export default function ShoppingList({
   async function handleShoppingItemToggle(shoppingItem: ShoppingItem) {
     if (togglingItemId || deletingItemId) return;
 
-    const completed = !shoppingItem.completed;
+    if (shoppingItem.completed) {
+      if (!shoppingItem.product) {
+        setError({
+          itemId: shoppingItem.id,
+          message: "Produkten kunde inte öppnas. Försök igen.",
+        });
+        return;
+      }
+
+      setError(null);
+      setPutAwayItem(shoppingItem);
+      return;
+    }
+
+    const completed = true;
     setTogglingItemId(shoppingItem.id);
     setError(null);
     setShoppingItems((currentItems) =>
@@ -119,8 +135,7 @@ export default function ShoppingList({
     );
 
     try {
-      const { shoppingItem: updatedItem, inventorySyncError } =
-        await toggleShoppingItemCompleted(
+      const updatedItem = await toggleShoppingItemCompleted(
         shoppingItem.id,
         completed
       );
@@ -130,9 +145,6 @@ export default function ShoppingList({
           item.id === updatedItem.id ? updatedItem : item
         )
       );
-      if (inventorySyncError) {
-        setError({ itemId: shoppingItem.id, message: inventorySyncError });
-      }
     } catch {
       setShoppingItems((currentItems) =>
         currentItems.map((item) =>
@@ -143,6 +155,46 @@ export default function ShoppingList({
         itemId: shoppingItem.id,
         message: "Kunde inte uppdatera produkten. Försök igen.",
       });
+    } finally {
+      setTogglingItemId(null);
+    }
+  }
+
+  async function handleInventorySaved() {
+    if (!putAwayItem || togglingItemId || deletingItemId) return;
+
+    const shoppingItem = putAwayItem;
+    setTogglingItemId(shoppingItem.id);
+    setError(null);
+    setShoppingItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === shoppingItem.id ? { ...item, completed: false } : item
+      )
+    );
+
+    try {
+      const updatedItem = await toggleShoppingItemCompleted(
+        shoppingItem.id,
+        false
+      );
+
+      setShoppingItems((currentItems) =>
+        currentItems.map((item) =>
+          item.id === updatedItem.id ? updatedItem : item
+        )
+      );
+      setPutAwayItem(null);
+    } catch {
+      setShoppingItems((currentItems) =>
+        currentItems.map((item) =>
+          item.id === shoppingItem.id ? shoppingItem : item
+        )
+      );
+      setError({
+        itemId: shoppingItem.id,
+        message: "Varan lades hemma, men kunde inte återställas i inköpslistan.",
+      });
+      throw new Error("Kunde inte uppdatera inköpslistan. Försök igen.");
     } finally {
       setTogglingItemId(null);
     }
@@ -187,8 +239,8 @@ export default function ShoppingList({
       <ListSearchSheet
         open={isSearchOpen}
         onOpenChange={setIsSearchOpen}
-        title="Sök i Handla"
-        placeholder="Sök i handlingslistan..."
+        title="Sök i inköpslistan"
+        placeholder="Sök i inköpslistan..."
         items={sortedShoppingItems.map((item) => ({
           id: item.id,
           label: item.product?.name ?? "Okänd produkt",
@@ -201,6 +253,18 @@ export default function ShoppingList({
         shoppingProductIds={shoppingProductIds}
         onShoppingItemAdded={handleShoppingItemAdded}
       />
+
+      {putAwayItem?.product && (
+        <AddInventorySheet
+          mode="put-away"
+          open
+          preselectedProduct={putAwayItem.product}
+          onOpenChange={(open) => {
+            if (!open) setPutAwayItem(null);
+          }}
+          onInventoryItemSaved={handleInventorySaved}
+        />
+      )}
 
       {deletingItemId && (
         <p aria-live="polite" className="mb-3 text-sm text-muted-foreground">
@@ -224,11 +288,11 @@ export default function ShoppingList({
         <section aria-labelledby="shopping-list-heading">
           <h2
             id="shopping-list-heading"
-            className="mb-3 text-sm font-semibold text-muted-foreground"
+            className="mb-2 text-sm font-semibold text-muted-foreground"
           >
             Din lista
           </h2>
-          <AppCard className="p-4">
+          <AppCard className="p-3">
             <ul className="divide-y divide-border">
               {sortedShoppingItems.map((item) => (
                 <ShoppingItemRow

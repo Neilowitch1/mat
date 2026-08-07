@@ -4,7 +4,6 @@ import { Clock, Heart, Pencil, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import AppCard from "@/components/AppCard";
-import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { deleteRecipe, updateRecipe } from "@/services/recipes.service";
@@ -65,37 +64,59 @@ export default function RecipeDetails({ initialRecipe, inventoryItems }: RecipeD
 
   return (
     <>
-      <AppHeader title={recipe.name} />
       <div className="space-y-3">
-        <AppCard>
+        <AppCard className="p-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"><Users aria-hidden="true" size={15} />{recipe.servings} portioner</span>
-              {recipe.prep_time_minutes !== null && <span className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"><Clock aria-hidden="true" size={15} />{recipe.prep_time_minutes} min</span>}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold leading-tight tracking-[-0.025em] text-primary">
+                {recipe.name}
+              </h1>
+              {recipe.description && (
+                <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                  {recipe.description}
+                </p>
+              )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="shrink-0">
               <Button type="button" variant="ghost" size="icon" disabled={isUpdatingFavorite} onClick={() => void toggleFavorite()} aria-label={recipe.favorite ? "Ta bort favoritmarkering" : "Markera som favorit"} className={`rounded-full ${recipe.favorite ? "bg-[#eee7f4] text-[#7c5e9e]" : "text-muted-foreground"}`}>
                 <Heart aria-hidden="true" className={recipe.favorite ? "fill-current" : ""} />
               </Button>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/70 pt-2.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Users aria-hidden="true" size={15} />
+                {recipe.servings} portioner
+              </span>
+              {recipe.prep_time_minutes !== null && (
+                <>
+                  <span aria-hidden="true" className="text-border">•</span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock aria-hidden="true" size={15} />
+                    {recipe.prep_time_minutes} min
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
               <Button type="button" variant="ghost" size="icon" onClick={() => setIsEditOpen(true)} aria-label="Redigera recept" className="rounded-full text-muted-foreground hover:bg-secondary hover:text-primary">
-                <Pencil aria-hidden="true" />
+                <Pencil aria-hidden="true" className="size-4" />
+              </Button>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setIsDeleteOpen(true)} aria-label="Ta bort recept" className="rounded-full text-muted-foreground/75 hover:bg-[#f5e8e6] hover:text-destructive">
+                <Trash2 aria-hidden="true" className="size-4" />
               </Button>
             </div>
           </div>
-          {recipe.description && <p className="mt-5 text-[0.9375rem] leading-7 text-muted-foreground">{recipe.description}</p>}
           {errorMessage && <p role="alert" className="mt-3 text-sm text-destructive">{errorMessage}</p>}
         </AppCard>
 
         <RecipeIngredientsSection recipeId={recipe.id} initialIngredients={recipe.ingredients ?? []} inventoryItems={inventoryItems} />
 
-        <AppCard>
+        <AppCard className="p-4">
           <h2 className="text-base font-semibold text-primary">Instruktioner</h2>
-          {recipe.instructions ? <p className="mt-3 whitespace-pre-wrap text-[0.9375rem] leading-7">{recipe.instructions}</p> : <p className="mt-2 text-sm text-muted-foreground">Inga instruktioner har lagts till ännu.</p>}
-          <div className="mt-5 border-t border-border pt-3">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setIsDeleteOpen(true)} className="rounded-full text-muted-foreground hover:bg-[#f5e8e6] hover:text-destructive">
-              <Trash2 aria-hidden="true" />Ta bort recept
-            </Button>
-          </div>
+          {recipe.instructions ? <p className="mt-2.5 max-w-prose whitespace-pre-wrap text-[0.9375rem] leading-7 text-foreground">{recipe.instructions}</p> : <p className="mt-2 text-sm text-muted-foreground">Inga instruktioner har lagts till ännu.</p>}
         </AppCard>
       </div>
 

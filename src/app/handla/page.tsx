@@ -11,7 +11,7 @@ export default async function HandlaPage() {
 
   return (
     <>
-      <AppHeader title="Handla" subtitle="Vad behöver handlas?" searchHref="/handla?search=1" icon={ShoppingBasket} />
+      <AppHeader title="Inköpslista" subtitle="Vad behöver handlas?" searchHref="/handla?search=1" icon={ShoppingBasket} className="mb-4" />
       <ShoppingList initialShoppingItems={shoppingItems} />
     </>
   );
