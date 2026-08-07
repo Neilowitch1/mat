@@ -1,3 +1,5 @@
+import type { InventoryStatus } from "@/types/database";
+
 export type QuantityWithUnit = {
   quantity: number;
   unit: string;
@@ -17,12 +19,30 @@ const UNIT_DEFINITIONS: Record<string, UnitDefinition> = {
   l: { group: "volume", factorToBase: 1_000 },
 };
 
+const INVENTORY_STATUS_FACTORS: Record<InventoryStatus, number> = {
+  full: 1,
+  three_quarters: 0.75,
+  half: 0.5,
+  low: 0.25,
+  empty: 0,
+};
+
 function normalizeUnit(unit: string): string {
   return unit.trim().toLocaleLowerCase("sv");
 }
 
 function roundQuantity(quantity: number): number {
   return Math.round((quantity + Number.EPSILON) * 1_000) / 1_000;
+}
+
+export function getEffectiveQuantity(
+  quantity: number,
+  unit: string,
+  status: InventoryStatus
+): number {
+  if (normalizeUnit(unit) !== "st") return quantity;
+
+  return roundQuantity(quantity * INVENTORY_STATUS_FACTORS[status]);
 }
 
 export function areUnitsCompatible(firstUnit: string, secondUnit: string): boolean {

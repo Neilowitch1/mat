@@ -32,6 +32,7 @@ import InventoryUnitField from "./InventoryUnitField";
 import {
   inventoryLocationLabels,
   inventoryLocations,
+  normalizeInventoryUnit,
   inventoryStatuses,
   inventoryUnits,
 } from "./inventoryFormOptions";
@@ -83,7 +84,7 @@ export default function AddInventorySheet({
   onInventoryItemSaved,
   mode = "add",
 }: AddInventorySheetProps) {
-  const preselectedUnit = preselectedProduct?.default_unit?.trim() || "st";
+  const preselectedUnit = normalizeInventoryUnit(preselectedProduct?.default_unit || "st");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -215,7 +216,7 @@ export default function AddInventorySheet({
   }
 
   function selectExistingProduct(product: Product) {
-    const defaultUnit = product.default_unit?.trim() || "st";
+    const defaultUnit = normalizeInventoryUnit(product.default_unit || "st");
     setSelection({ kind: "existing", product });
     setQuery(product.name);
     setUnit(defaultUnit);
@@ -502,7 +503,7 @@ export default function AddInventorySheet({
                     {formatConvertedQuantity({
                       quantity: existingItem.quantity,
                       unit: existingItem.unit?.trim() || "st",
-                    })} · {inventoryStatuses.find((option) => option.value === existingItem.status)?.label}
+                    })} ({inventoryStatuses.find((option) => option.value === existingItem.status)?.label})
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">
@@ -519,7 +520,7 @@ export default function AddInventorySheet({
                   <dd className="text-right font-semibold text-primary">
                     {refillPreview.result
                       ? formatConvertedQuantity(refillPreview.result)
-                      : "Välj enhet"} · Full
+                      : "Välj enhet"} (Full)
                   </dd>
                 </div>
               </dl>
@@ -544,7 +545,7 @@ export default function AddInventorySheet({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const existingUnit = existingItem.unit?.trim() || "st";
+                    const existingUnit = normalizeInventoryUnit(existingItem.unit || "st");
                     setUnit(existingUnit);
                     setIsCustomUnit(!inventoryUnits.includes(existingUnit));
                     setReplaceIncompatibleUnit(false);

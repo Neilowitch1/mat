@@ -22,6 +22,7 @@ import type {
 import InventoryUnitField from "./InventoryUnitField";
 import {
   inventoryLocations,
+  normalizeInventoryUnit,
   inventoryStatuses,
   inventoryUnits,
 } from "./inventoryFormOptions";
@@ -39,7 +40,7 @@ export default function EditInventoryItemSheet({
   onOpenChange,
   onItemChange,
 }: EditInventoryItemSheetProps) {
-  const initialUnit = item.unit?.trim() || "st";
+  const initialUnit = normalizeInventoryUnit(item.unit || "st");
   const [product, setProduct] = useState<Product | null>(item.product ?? null);
   const [location, setLocation] = useState<InventoryLocation>(item.location);
   const [quantity, setQuantity] = useState(String(item.quantity));
@@ -51,7 +52,7 @@ export default function EditInventoryItemSheet({
   const [message, setMessage] = useState<string | null>(null);
 
   function resetForm() {
-    const nextUnit = item.unit?.trim() || "st";
+    const nextUnit = normalizeInventoryUnit(item.unit || "st");
     setProduct(item.product ?? null);
     setLocation(item.location);
     setQuantity(String(item.quantity));

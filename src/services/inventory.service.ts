@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import {
+  getEffectiveQuantity,
   mergeCompatibleQuantities,
   type QuantityWithUnit,
 } from "@/lib/unitConversion";
@@ -198,7 +199,11 @@ export function getInventoryRefillPreview(
 ): InventoryRefillPreview {
   const result = mergeCompatibleQuantities(
     {
-      quantity: existingItem.quantity,
+      quantity: getEffectiveQuantity(
+        existingItem.quantity,
+        existingItem.unit?.trim() || "st",
+        existingItem.status
+      ),
       unit: existingItem.unit?.trim() || "st",
     },
     { quantity, unit }
