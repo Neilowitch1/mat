@@ -1,62 +1,47 @@
-# MAT - Roadmap
+# MAT – Roadmap
 
-## Sprint 1 - Shopping
+## v1.0 – Klart
 
-Status: 🚧
+### Handla
 
-### Mål
+- [x] Visa den gemensamma handlingslistan
+- [x] Sök bland produkter med autoslutförande
+- [x] Skapa och lägg till produkter
+- [x] Markera produkter som köpta eller inte köpta
+- [x] Synka köpta produkter till Hemma
+- [x] Ta bort produkter med optimistisk uppdatering
 
-Bygg en komplett handlingslista.
+### Hemma
 
-## Funktioner
+- [x] Visa och lägg till produkter per plats
+- [x] Ändra status och mängd direkt i listan
+- [x] Visa och ändra bäst före-datum
+- [x] Visa varningar för produkter som går ut snart eller har gått ut
+- [x] Lägg till produkter med låg eller tom status i Handla
+- [x] Ta bort produkter med optimistisk uppdatering
 
-- [ ] Visa shoppinglista
-- [ ] Sök produkter
-- [ ] Autoslutförande
-- [ ] Skapa produkt
-- [ ] Lägg till produkt
-- [ ] Markera som köpt
-- [ ] Ta bort produkt
+### Recept
 
-Definition of Done
+- [x] Lista och visa receptdetaljer
+- [x] Skapa, redigera, favoritmarkera och ta bort recept
+- [x] Lägg till, redigera och ta bort ingredienser
+- [x] Visa vilka ingredienser som finns hemma och vilka som saknas
+- [x] Lägg till saknade ingredienser i Handla
+- [x] Rangordna recept efter det som finns hemma
 
-- Allt sparas i Supabase
-- Mobilanpassat
-- Inga TypeScript-fel
-- Inga ESLint-fel
+### Gemensam grund
 
----
+- [x] Supabase som gemensam source of truth utan konto eller lokal persistens
+- [x] Realtime för `shopping_list` och `inventory`
+- [x] Synkning mellan flera öppna klienter
+- [x] Mobilanpassad navigation för Handla, Hemma, Recept och Inställningar
 
-## Sprint 2 - Skafferi
+## Efter v1.0
 
-- [ ] Visa produkter
-- [ ] Status
-- [ ] Ändra status
-- [ ] Automatisk "Slut"
-
----
-
-## Sprint 3 - Recept
-
-- [ ] Skapa recept
-- [ ] Redigera recept
-- [ ] Ingredienser
-- [ ] Saknade ingredienser
-- [ ] Lägg till saknade
-
----
-
-## Sprint 4 - Konto
-
-- [ ] Login
-- [ ] Hushåll
-- [ ] Delning
-
----
-
-## Sprint 5
-
-- [ ] AI
-- [ ] Barcode
-- [ ] Matsvinn
-- [ ] Statistik
+- Realtime-uppdatering av recept och receptingredienser i gränssnittet
+- Utbyggda användarval under Inställningar
+- Exakt jämförelse mellan receptmängd och tillgänglig mängd hemma
+- Streckkodsskanning
+- Stöd för minskat matsvinn och förbrukningshistorik
+- Statistik och insikter
+- Eventuella AI-baserade receptförslag

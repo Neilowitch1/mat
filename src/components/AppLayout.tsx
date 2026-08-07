@@ -8,8 +8,8 @@ interface Props {
 
 export default function AppLayout({ children }: Props) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col bg-[var(--background)] shadow-2xl">
-      <main className="flex-1 px-5 pt-8 pb-28">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-background shadow-[0_0_50px_rgba(54,62,54,0.08)]">
+      <main className="flex-1 px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
         {children}
       </main>
 

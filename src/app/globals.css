@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -49,23 +49,25 @@
 }
 
 :root {
-  --background: #f6f7fb;
-  --foreground: #111827;
-
-  --card: #ffffff;
-  --card-foreground: #111827;
-
-  --primary: #22c55e;
+  --background: #f7f6f3;
+  --foreground: #222722;
+  --card: #fffdf9;
+  --card-foreground: #222722;
+  --popover: #fffdf9;
+  --popover-foreground: #222722;
+  --primary: #58755e;
   --primary-foreground: #ffffff;
-
-  --secondary: #eef2f7;
-  --secondary-foreground: #111827;
-
-  --border: #e5e7eb;
-
-  --muted: #6b7280;
-
-  --radius: 20px;
+  --secondary: #f0ede7;
+  --secondary-foreground: #222722;
+  --muted: #f0ede7;
+  --muted-foreground: #6f746e;
+  --accent: #e8f0e9;
+  --accent-foreground: #425b48;
+  --destructive: #a6534e;
+  --border: #e7e2da;
+  --input: #e7e2da;
+  --ring: #58755e;
+  --radius: 22px;
 }
 
 .dark {
@@ -108,8 +110,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    min-height: 100dvh;
   }
   html {
     @apply font-sans;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button, a, input, [data-slot="sheet-content"] {
+    transition-duration: 180ms;
   }
 }

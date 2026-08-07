@@ -13,6 +13,17 @@ En modern matplaneringsapp med fokus på snabbhet, enkelhet och mobil användnin
 - Supabase
 - Vercel
 
+## Gemensamt hushåll
+
+Appen har inga användarkonton eller inloggning. Alla enheter som använder samma publicerade webbadress arbetar mot samma gemensamma data i Supabase.
+
+- Supabase Auth ska inte införas.
+- Data ska inte avgränsas med `user_id` eller `household_id`.
+- `products`, `shopping_list`, `inventory` och framtida `recipes` är globala för hushållet.
+- Supabase är source of truth. `localStorage` ska inte användas för permanent appdata.
+- React-state får användas för UI och optimistiska uppdateringar.
+- Arkitekturen ska möjliggöra Supabase Realtime mellan flera öppna enheter.
+
 ## Design
 
 - Mobile First

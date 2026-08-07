@@ -1,21 +1,18 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import AppHeader from "@/components/AppHeader";
+import InventoryList from "@/features/inventory/components/InventoryList";
+import { getInventory } from "@/services/inventory.service";
+import { connection } from "next/server";
+import { HomeIcon } from "@/components/navigationItems";
 
-export default function SkafferiPage() {
+export default async function HemmaPage() {
+  await connection();
+
+  const inventoryItems = await getInventory();
+
   return (
-    <main className="mx-auto max-w-md p-6">
-      <h1 className="mb-6 text-3xl font-bold">📦 Skafferi</h1>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Inga produkter ännu</CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Produkter som köps kommer senare automatiskt att hamna här.
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+    <>
+      <AppHeader title="Hemma" subtitle="Det här har du hemma" searchHref="/hemma?search=1" icon={HomeIcon} />
+      <InventoryList initialInventoryItems={inventoryItems} />
+    </>
   );
 }

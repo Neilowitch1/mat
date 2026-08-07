@@ -1,7 +1,9 @@
 "use client";
 
 import { Plus, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Input } from "@/components/ui/input";
 import { createProduct, searchProducts } from "@/services/products.service";
 import { addToShoppingList } from "@/services/shopping.service";
 import type { Product, ShoppingItem } from "@/types/database";
@@ -16,10 +18,34 @@ interface ShoppingInputProps {
   onShoppingItemAdded: (shoppingItem: ShoppingItem) => void;
 }
 
+function getSupabaseErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return "Ett okänt fel uppstod.";
+
+  try {
+    const parsedError: unknown = JSON.parse(error.message);
+
+    if (
+      parsedError &&
+      typeof parsedError === "object" &&
+      "message" in parsedError &&
+      typeof parsedError.message === "string"
+    ) {
+      return parsedError.message;
+    }
+  } catch {
+    return error.message;
+  }
+
+  return error.message;
+}
+
 export default function ShoppingInput({
   shoppingProductIds,
   onShoppingItemAdded,
 }: ShoppingInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
@@ -35,6 +61,13 @@ export default function ShoppingInput({
     : [];
 
   useEffect(() => {
+    if (searchParams.get("add") !== "1") return;
+    inputRef.current?.focus();
+    inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    router.replace("/handla", { scroll: false });
+  }, [router, searchParams]);
+
+  useEffect(() => {
     if (!showDropdown) return;
 
     let isCurrentRequest = true;
@@ -45,9 +78,10 @@ export default function ShoppingInput({
         if (isCurrentRequest) {
           setSearchResult({ query: trimmedQuery, products: matchingProducts });
         }
-      } catch {
+      } catch (error) {
         if (isCurrentRequest) {
           setSearchResult({ query: trimmedQuery, products: [] });
+          setErrorMessage(getSupabaseErrorMessage(error));
         }
       }
     }, 200);
@@ -84,8 +118,8 @@ export default function ShoppingInput({
 
     try {
       await addProductToShoppingList(product);
-    } catch {
-      setErrorMessage("Kunde inte lägga till produkten. Försök igen.");
+    } catch (error) {
+      setErrorMessage(getSupabaseErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -100,21 +134,23 @@ export default function ShoppingInput({
       const product = await createProduct(trimmedQuery);
 
       await addProductToShoppingList(product);
-    } catch {
-      setErrorMessage("Kunde inte skapa produkten. Försök igen.");
+    } catch (error) {
+      setErrorMessage(getSupabaseErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="relative mb-6">
+    <div className="relative mb-4">
       <Search
+        aria-hidden="true"
         size={18}
-        className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400"
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
       />
 
-      <input
+      <Input
+        ref={inputRef}
         value={query}
         onChange={(event) => {
           const nextQuery = event.target.value;
@@ -134,41 +170,26 @@ export default function ShoppingInput({
         aria-autocomplete="list"
         aria-expanded={showDropdown}
         aria-controls="product-search-results"
-        className="
-          h-14
-          w-full
-          rounded-2xl
-          border
-          bg-white
-          pl-11
-          pr-4
-          text-base
-          shadow-sm
-          outline-none
-          transition
-          focus:border-green-500
-          focus:ring-2
-          focus:ring-green-200
-        "
+        className="h-13 rounded-[20px] bg-card pl-11 pr-4 text-base"
       />
 
       {showDropdown && (
         <div
           id="product-search-results"
           role="listbox"
-          className="absolute z-10 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-lg"
+          className="absolute z-10 mt-2 max-h-72 w-full overflow-y-auto rounded-[20px] border border-border bg-card p-1.5 shadow-[0_14px_35px_rgba(34,39,34,0.12)]"
         >
           {errorMessage && (
             <p
               role="alert"
-              className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"
+              className="rounded-xl bg-[#f5e8e6] px-3 py-2 text-sm text-destructive"
             >
               {errorMessage}
             </p>
           )}
 
           {isLoading ? (
-            <p className="px-3 py-3 text-sm text-neutral-500">Söker...</p>
+            <p className="px-3 py-3 text-sm text-muted-foreground">Söker...</p>
           ) : products.length > 0 ? (
             products.map((product) => (
               <button
@@ -178,18 +199,18 @@ export default function ShoppingInput({
                 aria-selected="false"
                 onClick={() => handleProductSelect(product)}
                 disabled={isSubmitting}
-                className="flex w-full items-center rounded-xl px-3 py-3 text-left transition hover:bg-green-50 focus:bg-green-50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full items-center rounded-2xl px-3 py-3 text-left transition hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="min-w-0 flex-1 truncate text-base font-medium text-neutral-900">
+                <span className="min-w-0 flex-1 truncate text-base font-medium text-foreground">
                   {product.name}
                 </span>
                 {product.category && (
-                  <span className="ml-3 shrink-0 text-sm text-neutral-500">
+                  <span className="ml-3 shrink-0 text-sm text-muted-foreground">
                     {product.category}
                   </span>
                 )}
                 {shoppingProductIds.includes(product.id) && (
-                  <span className="ml-3 shrink-0 text-sm text-green-700">
+                  <span className="ml-3 shrink-0 text-sm text-[#425b48]">
                     På listan
                   </span>
                 )}
@@ -202,7 +223,7 @@ export default function ShoppingInput({
               aria-selected="false"
               onClick={handleCreateProduct}
               disabled={isSubmitting}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-base font-medium text-green-700 transition hover:bg-green-50 focus:bg-green-50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-2 rounded-2xl px-3 py-3 text-left text-base font-medium text-[#425b48] transition hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus size={18} aria-hidden="true" />
               <span>

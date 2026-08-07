@@ -21,6 +21,20 @@ Appen ska kännas som en native iOS/Android-app trots att den är byggd med Next
 
 ---
 
+# Data Ownership
+
+MAT är en app för ett enda gemensamt hushåll utan användarkonton eller login.
+
+Alla klienter som öppnar samma publicerade webbadress använder samma globala data i Supabase. Tabeller som `products`, `shopping_list`, `inventory` och framtida `recipes` ska därför inte innehålla `user_id` eller `household_id` för dataisolering.
+
+- Supabase Auth ska inte användas.
+- Supabase är permanent source of truth.
+- `localStorage` ska inte användas för permanent appdata.
+- React-state används endast för UI-state och optimistiska uppdateringar.
+- Services ska hållas kompatibla med framtida Supabase Realtime-prenumerationer för synkning mellan öppna enheter.
+
+---
+
 # Folder Structure
 
 src/
@@ -206,10 +220,6 @@ Skanna produkt.
 
 Lägg till i inventory.
 
-## Household
+## Realtime
 
-Flera användare.
-
-Gemensamt skafferi.
-
-Gemensam handlingslista.
+Supabase Realtime för gemensam synkning av `shopping_list`, `inventory` och `recipes` mellan alla öppna enheter.
