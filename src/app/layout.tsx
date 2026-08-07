@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
 import "./globals.css";
-import Providers from "@/components/providers";
+
+import AppLayout from "@/components/AppLayout";
+
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
   title: "Mat",
@@ -14,8 +23,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="sv">
-      <body>
-        <Providers>{children}</Providers>
+      <body className={cn("font-sans", geist.variable)}>
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   );

@@ -3,61 +3,79 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  House,
   ShoppingCart,
-  Refrigerator,
   BookOpen,
   Settings,
 } from "lucide-react";
 
-const items = [
-  {
-    href: "/handla",
-    label: "Handla",
-    icon: ShoppingCart,
-  },
-  {
-    href: "/hemma",
-    label: "Hemma",
-    icon: Refrigerator,
-  },
-  {
-    href: "/recept",
-    label: "Recept",
-    icon: BookOpen,
-  },
-  {
-    href: "/installningar",
-    label: "Inst.",
-    icon: Settings,
-  },
-];
-
 export default function BottomNavbar() {
   const pathname = usePathname();
 
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 border-t bg-white dark:bg-zinc-900">
-      <div className="mx-auto flex max-w-md justify-around py-3">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href;
+  const items = [
+    {
+      href: "/hemma",
+      icon: House,
+    },
+    {
+      href: "/handla",
+      icon: ShoppingCart,
+    },
+    {
+      href: "/recept",
+      icon: BookOpen,
+    },
+    {
+      href: "/installningar",
+      icon: Settings,
+    },
+  ];
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-1 text-xs transition ${
+  return (
+    <nav
+      className="
+      fixed
+      bottom-0
+      left-1/2
+      z-40
+      flex
+      h-20
+      w-full
+      max-w-md
+      -translate-x-1/2
+      items-center
+      justify-around
+      border-t
+      bg-white/95
+      backdrop-blur-md
+    "
+    >
+      {items.map(({ href, icon: Icon }) => {
+        const active = pathname === href;
+
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={`
+              flex
+              h-14
+              w-14
+              items-center
+              justify-center
+              rounded-full
+              transition-all
+              ${
                 active
-                  ? "text-green-600"
-                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
-            >
-              <Icon size={22} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
+                  ? "bg-green-100 text-green-600"
+                  : "text-neutral-500 hover:bg-neutral-100"
+              }
+            `}
+          >
+            <Icon size={26} />
+          </Link>
+        );
+      })}
     </nav>
   );
 }
