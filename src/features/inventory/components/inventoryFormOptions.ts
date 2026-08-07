@@ -50,13 +50,3 @@ export const inventoryUnitGroups = [
 ] as const;
 
 export const inventoryUnits: string[] = inventoryUnitGroups.flatMap(({ units }) => [...units]);
-
-const legacyInventoryUnits: Record<string, string> = {
-  förp: "Förpackning",
-  pkt: "Paket",
-};
-
-export function normalizeInventoryUnit(unit: string): string {
-  const trimmedUnit = unit.trim();
-  return legacyInventoryUnits[trimmedUnit.toLocaleLowerCase("sv-SE")] ?? trimmedUnit;
-}

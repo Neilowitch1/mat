@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PackageOpen } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
 import { Button } from "@/components/ui/button";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import {
+  classifyInventoryExpiration,
+  type InventoryExpirationGroup,
+} from "@/lib/inventoryExpiration";
 import {
   getInventoryItem,
   removeInventoryItem,
@@ -23,6 +27,23 @@ import {
 interface InventoryListProps {
   initialInventoryItems: InventoryItem[];
 }
+
+const expirationGroupOptions: Array<{
+  value: InventoryExpirationGroup;
+  label: string;
+  className: string;
+}> = [
+  { value: "expired", label: "Utgånget", className: "text-destructive/80" },
+  { value: "today", label: "Går ut idag", className: "text-[#96643d]" },
+  { value: "soon", label: "Går ut snart", className: "text-[#96643d]" },
+  {
+    value: "thisWeek",
+    label: "Går ut denna vecka",
+    className: "text-[#8a7447]",
+  },
+  { value: "later", label: "Senare", className: "text-muted-foreground" },
+  { value: "none", label: "Inget bäst före", className: "text-muted-foreground" },
+];
 
 export default function InventoryList({
   initialInventoryItems,
@@ -154,10 +175,40 @@ export default function InventoryList({
     }
   }
 
-  const filteredInventoryItems =
-    locationFilter === "all"
-      ? inventoryItems
-      : inventoryItems.filter((item) => item.location === locationFilter);
+  const groupedInventoryItems = useMemo(() => {
+    const filteredItems =
+      locationFilter === "all"
+        ? inventoryItems
+        : inventoryItems.filter((item) => item.location === locationFilter);
+
+    return expirationGroupOptions.flatMap((group) => {
+      const items = filteredItems
+        .filter(
+          (item) => classifyInventoryExpiration(item.expires_at) === group.value
+        )
+        .sort((firstItem, secondItem) => {
+          if (firstItem.expires_at && secondItem.expires_at) {
+            const dateComparison = firstItem.expires_at.localeCompare(
+              secondItem.expires_at
+            );
+            if (dateComparison !== 0) return dateComparison;
+          }
+
+          return (firstItem.product?.name ?? "").localeCompare(
+            secondItem.product?.name ?? "",
+            "sv",
+            { sensitivity: "base" }
+          );
+        });
+
+      return items.length > 0 ? [{ ...group, items }] : [];
+    });
+  }, [inventoryItems, locationFilter]);
+
+  const filteredInventoryItemCount = groupedInventoryItems.reduce(
+    (count, group) => count + group.items.length,
+    0
+  );
 
   return (
     <>
@@ -235,28 +286,48 @@ export default function InventoryList({
             </div>
           </fieldset>
 
-          {filteredInventoryItems.length === 0 ? (
+          {filteredInventoryItemCount === 0 ? (
             <AppCard className="py-6 text-center text-sm text-muted-foreground">
               Inga produkter på den här platsen.
             </AppCard>
           ) : (
-          <div className="space-y-2">
-            {filteredInventoryItems.map((item) => (
-              <div key={item.id} id={`inventory-item-${item.id}`} tabIndex={-1} className="scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
-                <InventoryItemRow
-                  item={item}
-                  onItemChange={handleInventoryItemChange}
-                  onDelete={handleInventoryItemDelete}
-                  deleteDisabled={Boolean(deletingItemId)}
-                  deleteErrorMessage={
-                    deleteError?.itemId === item.id
-                      ? deleteError.message
-                      : undefined
-                  }
-                />
-              </div>
-            ))}
-          </div>
+            <div className="space-y-4">
+              {groupedInventoryItems.map((group) => (
+                <section
+                  key={group.value}
+                  aria-labelledby={`inventory-group-${group.value}`}
+                >
+                  <h2
+                    id={`inventory-group-${group.value}`}
+                    className={`mb-1.5 px-1 text-[0.7rem] font-semibold tracking-[0.08em] uppercase ${group.className}`}
+                  >
+                    {group.label}
+                  </h2>
+                  <div className="space-y-2">
+                    {group.items.map((item) => (
+                      <div
+                        key={item.id}
+                        id={`inventory-item-${item.id}`}
+                        tabIndex={-1}
+                        className="scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                      >
+                        <InventoryItemRow
+                          item={item}
+                          onItemChange={handleInventoryItemChange}
+                          onDelete={handleInventoryItemDelete}
+                          deleteDisabled={Boolean(deletingItemId)}
+                          deleteErrorMessage={
+                            deleteError?.itemId === item.id
+                              ? deleteError.message
+                              : undefined
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           )}
         </section>
       )}

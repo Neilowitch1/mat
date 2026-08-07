@@ -13,6 +13,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { updateInventoryItem } from "@/services/inventory.service";
+import { normalizeStoredUnit } from "@/lib/unitConversion";
 import type {
   InventoryItem,
   InventoryLocation,
@@ -22,7 +23,6 @@ import type {
 import InventoryUnitField from "./InventoryUnitField";
 import {
   inventoryLocations,
-  normalizeInventoryUnit,
   inventoryStatuses,
   inventoryUnits,
 } from "./inventoryFormOptions";
@@ -40,7 +40,7 @@ export default function EditInventoryItemSheet({
   onOpenChange,
   onItemChange,
 }: EditInventoryItemSheetProps) {
-  const initialUnit = normalizeInventoryUnit(item.unit || "st");
+  const initialUnit = normalizeStoredUnit(item.unit || "st");
   const [product, setProduct] = useState<Product | null>(item.product ?? null);
   const [location, setLocation] = useState<InventoryLocation>(item.location);
   const [quantity, setQuantity] = useState(String(item.quantity));
@@ -52,7 +52,7 @@ export default function EditInventoryItemSheet({
   const [message, setMessage] = useState<string | null>(null);
 
   function resetForm() {
-    const nextUnit = normalizeInventoryUnit(item.unit || "st");
+    const nextUnit = normalizeStoredUnit(item.unit || "st");
     setProduct(item.product ?? null);
     setLocation(item.location);
     setQuantity(String(item.quantity));
@@ -66,6 +66,15 @@ export default function EditInventoryItemSheet({
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
     if (nextOpen) resetForm();
+  }
+
+  function handleProductChange(nextProduct: Product | null) {
+    if (nextProduct && nextProduct.id !== product?.id) {
+      const nextUnit = normalizeStoredUnit(nextProduct.default_unit || "st");
+      setUnit(nextUnit);
+      setIsCustomUnit(!inventoryUnits.includes(nextUnit));
+    }
+    setProduct(nextProduct);
   }
 
   async function handleSave() {
@@ -126,7 +135,7 @@ export default function EditInventoryItemSheet({
             product={product}
             disabled={isSaving}
             placeholder="Välj produkt"
-            onChange={setProduct}
+            onChange={handleProductChange}
           />
 
           <fieldset className="mt-5">

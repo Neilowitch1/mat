@@ -27,8 +27,18 @@ const INVENTORY_STATUS_FACTORS: Record<InventoryStatus, number> = {
   empty: 0,
 };
 
+const LEGACY_UNIT_NAMES: Record<string, string> = {
+  förp: "Förpackning",
+  pkt: "Paket",
+};
+
 function normalizeUnit(unit: string): string {
   return unit.trim().toLocaleLowerCase("sv");
+}
+
+export function normalizeStoredUnit(unit: string): string {
+  const trimmedUnit = unit.trim();
+  return LEGACY_UNIT_NAMES[normalizeUnit(trimmedUnit)] ?? trimmedUnit;
 }
 
 function roundQuantity(quantity: number): number {

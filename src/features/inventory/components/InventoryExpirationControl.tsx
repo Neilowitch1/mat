@@ -12,35 +12,19 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { classifyInventoryExpiration } from "@/lib/inventoryExpiration";
 import { updateInventoryExpiration } from "@/services/inventory.service";
 import type { InventoryItem } from "@/types/database";
 
 type ExpirationState = "expired" | "expiringSoon" | "normal";
 
-const MILLISECONDS_PER_DAY = 86_400_000;
-
-function calendarDateToDayNumber(date: string): number {
-  const [year, month, day] = date.split("-").map(Number);
-
-  return Date.UTC(year, month - 1, day) / MILLISECONDS_PER_DAY;
-}
-
-function getTodayDayNumber(): number {
-  const today = new Date();
-
-  return Date.UTC(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate()
-  ) / MILLISECONDS_PER_DAY;
-}
-
 function getExpirationState(expiresAt: string): ExpirationState {
-  const daysRemaining =
-    calendarDateToDayNumber(expiresAt) - getTodayDayNumber();
+  const expirationGroup = classifyInventoryExpiration(expiresAt);
 
-  if (daysRemaining < 0) return "expired";
-  if (daysRemaining <= 3) return "expiringSoon";
+  if (expirationGroup === "expired") return "expired";
+  if (expirationGroup === "today" || expirationGroup === "soon") {
+    return "expiringSoon";
+  }
 
   return "normal";
 }

@@ -4,6 +4,7 @@ import {
   mergeCompatibleQuantities,
   type QuantityWithUnit,
 } from "@/lib/unitConversion";
+import { updateProductDefaultUnit } from "@/services/products.service";
 import type {
   InventoryItem,
   InventoryLocation,
@@ -188,6 +189,22 @@ export async function addInventoryItem({
 
   if (error) throw error;
 
+  if (data.unit?.trim()) {
+    try {
+      await updateProductDefaultUnit(productId, data.unit);
+    } catch (defaultUnitError) {
+      const { error: rollbackError } = await supabase
+        .from("inventory")
+        .delete()
+        .eq("id", data.id);
+
+      if (rollbackError) {
+        throw new Error("Produkten lades till hemma men standardenheten kunde inte sparas.");
+      }
+      throw defaultUnitError;
+    }
+  }
+
   return { inventoryItem: data, alreadyExists: false };
 }
 
@@ -302,6 +319,9 @@ export async function updateInventoryItem(
     return { inventoryItem: currentItem, alreadyExists: true };
   }
 
+  const previousItem = await getInventoryItem(id);
+  if (!previousItem) throw new Error("Produkten finns inte längre hemma.");
+
   const { data, error } = await supabase
     .from("inventory")
     .update({
@@ -326,6 +346,29 @@ export async function updateInventoryItem(
 
   if (error) throw error;
   if (!data) throw new Error("Kunde inte uppdatera produkten hemma.");
+
+  if (data.unit?.trim()) {
+    try {
+      await updateProductDefaultUnit(productId, data.unit);
+    } catch (defaultUnitError) {
+      const { error: rollbackError } = await supabase
+        .from("inventory")
+        .update({
+          product_id: previousItem.product_id,
+          quantity: previousItem.quantity,
+          unit: previousItem.unit,
+          status: previousItem.status,
+          location: previousItem.location,
+          expires_at: previousItem.expires_at,
+        })
+        .eq("id", id);
+
+      if (rollbackError) {
+        throw new Error("Produkten uppdaterades hemma men standardenheten kunde inte sparas.");
+      }
+      throw defaultUnitError;
+    }
+  }
 
   return { inventoryItem: data, alreadyExists: false };
 }

@@ -9,19 +9,22 @@ import ListSearchSheet from "@/components/ListSearchSheet";
 import { Button } from "@/components/ui/button";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { getInventory } from "@/services/inventory.service";
-import type { InventoryItem, Recipe } from "@/types/database";
+import type { InventoryItem, Product, Recipe } from "@/types/database";
 import { rankRecipeSuggestions } from "../recipeAvailability";
 import CreateRecipeSheet from "./CreateRecipeSheet";
+import FindRecipes from "./FindRecipes";
 import RecipeSuggestionCard from "./RecipeSuggestionCard";
 
 interface RecipeListProps {
   initialRecipes: Recipe[];
   initialInventoryItems: InventoryItem[];
+  products: Product[];
 }
 
-export default function RecipeList({ initialRecipes, initialInventoryItems }: RecipeListProps) {
+export default function RecipeList({ initialRecipes, initialInventoryItems, products }: RecipeListProps) {
   const [recipes, setRecipes] = useState(initialRecipes);
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
+  const [activeTab, setActiveTab] = useState<"mine" | "find">("mine");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const router = useRouter();
@@ -74,7 +77,32 @@ export default function RecipeList({ initialRecipes, initialInventoryItems }: Re
         onSelect={(item) => router.push(`/recept/${item.id}`)}
       />
 
-      {recipes.length === 0 ? (
+      <div className="mb-4 grid grid-cols-2 gap-0.5 rounded-[18px] bg-secondary p-0.5" role="tablist" aria-label="Receptvy">
+        <Button
+          type="button"
+          role="tab"
+          variant="ghost"
+          aria-selected={activeTab === "mine"}
+          onClick={() => setActiveTab("mine")}
+          className={`h-9 rounded-[14px] text-sm ${activeTab === "mine" ? "bg-card text-primary shadow-sm hover:bg-card" : "text-muted-foreground"}`}
+        >
+          Mina recept
+        </Button>
+        <Button
+          type="button"
+          role="tab"
+          variant="ghost"
+          aria-selected={activeTab === "find"}
+          onClick={() => setActiveTab("find")}
+          className={`h-9 rounded-[14px] text-sm ${activeTab === "find" ? "bg-card text-primary shadow-sm hover:bg-card" : "text-muted-foreground"}`}
+        >
+          Hitta recept
+        </Button>
+      </div>
+
+      {activeTab === "find" ? (
+        <FindRecipes inventoryItems={inventoryItems} products={products} />
+      ) : recipes.length === 0 ? (
         <AppCard>
           <div className="flex flex-col items-center px-3 py-8 text-center">
             <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#eee7f4] text-[#7c5e9e]">

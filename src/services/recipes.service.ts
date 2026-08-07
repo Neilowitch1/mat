@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { updateProductDefaultUnit } from "@/services/products.service";
 import type { Recipe, RecipeIngredient } from "@/types/database";
 
 export type CreateRecipeInput = Pick<Recipe, "name"> &
@@ -20,6 +21,21 @@ export interface RecipeIngredientInput {
   productId: string;
   amount: number | null;
   unit: string | null;
+}
+
+async function updateIngredientDefaultUnits(
+  ingredients: RecipeIngredientInput[]
+): Promise<void> {
+  await Promise.all(
+    ingredients
+      .filter(
+        (ingredient): ingredient is RecipeIngredientInput & { unit: string } =>
+          Boolean(ingredient.unit?.trim())
+      )
+      .map((ingredient) =>
+        updateProductDefaultUnit(ingredient.productId, ingredient.unit)
+      )
+  );
 }
 
 export async function getRecipes(): Promise<Recipe[]> {
@@ -85,24 +101,27 @@ export async function createRecipeWithIngredients(
 ): Promise<Recipe> {
   const recipe = await createRecipe(recipeInput);
 
-  if (ingredients.length > 0) {
-    const { error } = await supabase.from("recipe_ingredients").insert(
-      ingredients.map((ingredient) => ({
-        recipe_id: recipe.id,
-        product_id: ingredient.productId,
-        amount: ingredient.amount,
-        unit: ingredient.unit,
-      }))
-    );
+  try {
+    if (ingredients.length > 0) {
+      const { error } = await supabase.from("recipe_ingredients").insert(
+        ingredients.map((ingredient) => ({
+          recipe_id: recipe.id,
+          product_id: ingredient.productId,
+          amount: ingredient.amount,
+          unit: ingredient.unit,
+        }))
+      );
 
-    if (error) {
-      try {
-        await deleteRecipe(recipe.id);
-      } catch {
-        throw new Error("Ingredienserna kunde inte sparas och receptet kunde inte återställas.");
-      }
-      throw error;
+      if (error) throw error;
+      await updateIngredientDefaultUnits(ingredients);
     }
+  } catch (error) {
+    try {
+      await deleteRecipe(recipe.id);
+    } catch {
+      throw new Error("Ingredienserna kunde inte sparas och receptet kunde inte återställas.");
+    }
+    throw error;
   }
 
   const completeRecipe = await getRecipe(recipe.id);
@@ -126,6 +145,21 @@ export async function addRecipeIngredient(
     .single();
 
   if (error) throw error;
+
+  try {
+    await updateIngredientDefaultUnits([input]);
+  } catch (defaultUnitError) {
+    const { error: rollbackError } = await supabase
+      .from("recipe_ingredients")
+      .delete()
+      .eq("id", data.id);
+
+    if (rollbackError) {
+      throw new Error("Ingrediensen sparades men standardenheten kunde inte uppdateras.");
+    }
+    throw defaultUnitError;
+  }
+
   return data;
 }
 
@@ -133,6 +167,14 @@ export async function updateRecipeIngredient(
   id: string,
   input: RecipeIngredientInput
 ): Promise<RecipeIngredient> {
+  const { data: previousIngredient, error: readError } = await supabase
+    .from("recipe_ingredients")
+    .select("product_id, amount, unit")
+    .eq("id", id)
+    .single();
+
+  if (readError) throw readError;
+
   const { data, error } = await supabase
     .from("recipe_ingredients")
     .update({
@@ -145,6 +187,21 @@ export async function updateRecipeIngredient(
     .single();
 
   if (error) throw error;
+
+  try {
+    await updateIngredientDefaultUnits([input]);
+  } catch (defaultUnitError) {
+    const { error: rollbackError } = await supabase
+      .from("recipe_ingredients")
+      .update(previousIngredient)
+      .eq("id", id);
+
+    if (rollbackError) {
+      throw new Error("Ingrediensen uppdaterades men standardenheten kunde inte sparas.");
+    }
+    throw defaultUnitError;
+  }
+
   return data;
 }
 

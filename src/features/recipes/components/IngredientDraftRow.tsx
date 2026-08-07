@@ -3,6 +3,7 @@
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { normalizeStoredUnit } from "@/lib/unitConversion";
 import type { Product } from "@/types/database";
 import ProductSearchField from "@/components/ProductSearchField";
 
@@ -37,7 +38,23 @@ export default function IngredientDraftRow({ draft, excludedProductIds, disabled
         </div>
       </div>
 
-      <ProductSearchField id={`ingredient-product-${draft.key}`} product={draft.product} excludedProductIds={excludedProductIds} placeholder="Lägg till eller sök produkt..." duplicateMessage="Produkten finns redan i receptet." disabled={disabled} onChange={(product) => onChange({ ...draft, product })} />
+      <ProductSearchField
+        id={`ingredient-product-${draft.key}`}
+        product={draft.product}
+        excludedProductIds={excludedProductIds}
+        placeholder="Lägg till eller sök produkt..."
+        duplicateMessage="Produkten finns redan i receptet."
+        disabled={disabled}
+        onChange={(product) =>
+          onChange({
+            ...draft,
+            product,
+            unit: product?.default_unit
+              ? normalizeStoredUnit(product.default_unit)
+              : draft.unit,
+          })
+        }
+      />
 
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Input aria-label="Mängd" type="number" min="0" step="any" inputMode="decimal" value={draft.amount} disabled={disabled} onChange={(event) => onChange({ ...draft, amount: event.target.value })} placeholder="Mängd" className="h-10 text-base md:text-sm" />

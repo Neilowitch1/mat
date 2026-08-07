@@ -32,10 +32,10 @@ import InventoryUnitField from "./InventoryUnitField";
 import {
   inventoryLocationLabels,
   inventoryLocations,
-  normalizeInventoryUnit,
   inventoryStatuses,
   inventoryUnits,
 } from "./inventoryFormOptions";
+import { normalizeStoredUnit } from "@/lib/unitConversion";
 
 type ProductSelection =
   | { kind: "existing"; product: Product }
@@ -84,7 +84,7 @@ export default function AddInventorySheet({
   onInventoryItemSaved,
   mode = "add",
 }: AddInventorySheetProps) {
-  const preselectedUnit = normalizeInventoryUnit(preselectedProduct?.default_unit || "st");
+  const preselectedUnit = normalizeStoredUnit(preselectedProduct?.default_unit || "st");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -216,7 +216,7 @@ export default function AddInventorySheet({
   }
 
   function selectExistingProduct(product: Product) {
-    const defaultUnit = normalizeInventoryUnit(product.default_unit || "st");
+    const defaultUnit = normalizeStoredUnit(product.default_unit || "st");
     setSelection({ kind: "existing", product });
     setQuery(product.name);
     setUnit(defaultUnit);
@@ -545,7 +545,7 @@ export default function AddInventorySheet({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const existingUnit = normalizeInventoryUnit(existingItem.unit || "st");
+                    const existingUnit = normalizeStoredUnit(existingItem.unit || "st");
                     setUnit(existingUnit);
                     setIsCustomUnit(!inventoryUnits.includes(existingUnit));
                     setReplaceIncompatibleUnit(false);
