@@ -98,3 +98,41 @@ export async function updateProductDefaultUnit(
 
   if (updateError) throw updateError;
 }
+
+export async function renameProduct(
+  productId: string,
+  newName: string
+): Promise<Product> {
+  const normalizedName = normalizeProductDisplayName(newName);
+
+  // Finns redan en annan produkt med samma namn?
+  const { data: existingProduct, error: existingError } = await supabase
+    .from("products")
+    .select("id")
+    .ilike("name", normalizedName)
+    .neq("id", productId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  if (existingProduct) {
+    throw new Error("Det finns redan en produkt med det namnet.");
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .update({
+      name: normalizedName,
+    })
+    .eq("id", productId)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}

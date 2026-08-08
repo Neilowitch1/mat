@@ -9,8 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
+
 import { Input } from "@/components/ui/input";
-import { createProduct, searchProducts } from "@/services/products.service";
+import {
+  createProduct,
+  searchProducts,
+} from "@/services/products.service";
+
 import type { Product } from "@/types/database";
 
 interface ProductSearchFieldProps {
@@ -26,39 +31,79 @@ interface ProductSearchFieldProps {
 }
 
 export interface ProductSearchFieldHandle {
-  closeDropdown: (options?: { clearResults?: boolean; focus?: boolean }) => void;
+  closeDropdown: (options?: {
+    clearResults?: boolean;
+    focus?: boolean;
+  }) => void;
 }
 
-const ProductSearchField = forwardRef<ProductSearchFieldHandle, ProductSearchFieldProps>(function ProductSearchField({
-  id,
-  product,
-  excludedProductIds = [],
-  disabled,
-  placeholder = "Lägg till produkt",
-  duplicateMessage = "Produkten är redan vald.",
-  onDuplicate,
-  onQueryChange,
-  onChange,
-}, ref) {
+function normalizeProductName(value: string) {
+  return value.trim().toLocaleLowerCase("sv");
+}
+
+const ProductSearchField = forwardRef<
+  ProductSearchFieldHandle,
+  ProductSearchFieldProps
+>(function ProductSearchField(
+  {
+    id,
+    product,
+    excludedProductIds = [],
+    disabled,
+    placeholder = "Lägg till produkt",
+    duplicateMessage = "Produkten är redan vald.",
+    onDuplicate,
+    onQueryChange,
+    onChange,
+  },
+  ref
+) {
   const inputRef = useRef<HTMLInputElement>(null);
   const suppressNextFocusOpenRef = useRef(false);
+
   const [query, setQuery] = useState(product?.name ?? "");
   const [results, setResults] = useState<Product[]>([]);
   const [searchedQuery, setSearchedQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const trimmedQuery = query.trim();
-  const canSearch = !product && isOpen && trimmedQuery.length >= 2;
-  const isSearching = canSearch && searchedQuery !== trimmedQuery;
-  const hasExactMatch = results.some(
-    (result) =>
-      result.name.toLocaleLowerCase("sv") ===
-      trimmedQuery.toLocaleLowerCase("sv")
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(
+    null
   );
 
+  const trimmedQuery = query.trim();
+
+  const canSearch =
+    !product &&
+    isOpen &&
+    trimmedQuery.length >= 2;
+
+  const currentSearchIsFinished =
+    searchedQuery === trimmedQuery;
+
+  const isSearching =
+    canSearch && !currentSearchIsFinished;
+
+  const normalizedQuery =
+    normalizeProductName(trimmedQuery);
+
+  const hasExactMatch =
+    currentSearchIsFinished &&
+    results.some(
+      (result) =>
+        normalizeProductName(result.name) === normalizedQuery
+    );
+
+  const canCreate =
+    currentSearchIsFinished &&
+    trimmedQuery.length >= 2 &&
+    !hasExactMatch;
+
   const closeDropdown = useCallback(
-    (options?: { clearResults?: boolean; focus?: boolean }) => {
+    (options?: {
+      clearResults?: boolean;
+      focus?: boolean;
+    }) => {
       setIsOpen(false);
 
       if (options?.clearResults) {
@@ -68,28 +113,50 @@ const ProductSearchField = forwardRef<ProductSearchFieldHandle, ProductSearchFie
 
       if (options?.focus) {
         suppressNextFocusOpenRef.current = true;
-        window.requestAnimationFrame(() => inputRef.current?.focus());
+
+        window.requestAnimationFrame(() => {
+          inputRef.current?.focus();
+        });
       }
     },
     []
   );
 
-  useImperativeHandle(ref, () => ({ closeDropdown }), [closeDropdown]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      closeDropdown,
+    }),
+    [closeDropdown]
+  );
 
   useEffect(() => {
     if (!canSearch) return;
+
     let isCurrent = true;
+
     const timeout = window.setTimeout(async () => {
       try {
-        const products = await searchProducts(trimmedQuery);
-        if (isCurrent) {
-          setResults(products);
-          setSearchedQuery(trimmedQuery);
-        }
+        const products =
+          await searchProducts(trimmedQuery);
+
+        if (!isCurrent) return;
+
+        setResults(products);
+        setSearchedQuery(trimmedQuery);
+        setErrorMessage(null);
       } catch {
-        if (isCurrent) setErrorMessage("Kunde inte söka efter produkter.");
+        if (!isCurrent) return;
+
+        setResults([]);
+        setSearchedQuery(trimmedQuery);
+
+        setErrorMessage(
+          "Kunde inte söka efter produkter."
+        );
       }
     }, 200);
+
     return () => {
       isCurrent = false;
       window.clearTimeout(timeout);
@@ -97,15 +164,23 @@ const ProductSearchField = forwardRef<ProductSearchFieldHandle, ProductSearchFie
   }, [canSearch, trimmedQuery]);
 
   function selectProduct(nextProduct: Product) {
-    if (excludedProductIds.includes(nextProduct.id)) {
+    if (
+      excludedProductIds.includes(nextProduct.id)
+    ) {
       if (onDuplicate) {
         onDuplicate(nextProduct);
       } else {
         setErrorMessage(duplicateMessage);
-        closeDropdown({ clearResults: true, focus: true });
+
+        closeDropdown({
+          clearResults: true,
+          focus: true,
+        });
       }
+
       return;
     }
+
     onChange(nextProduct);
     setQuery(nextProduct.name);
     setIsOpen(false);
@@ -113,14 +188,26 @@ const ProductSearchField = forwardRef<ProductSearchFieldHandle, ProductSearchFie
   }
 
   async function handleCreate() {
-    if (!trimmedQuery || isCreating) return;
+    if (
+      !trimmedQuery ||
+      isCreating ||
+      hasExactMatch
+    ) {
+      return;
+    }
+
     setIsCreating(true);
     setErrorMessage(null);
+
     try {
-      const createdProduct = await createProduct(trimmedQuery);
+      const createdProduct =
+        await createProduct(trimmedQuery);
+
       selectProduct(createdProduct);
     } catch {
-      setErrorMessage("Kunde inte skapa produkten.");
+      setErrorMessage(
+        "Kunde inte skapa produkten."
+      );
     } finally {
       setIsCreating(false);
     }
@@ -128,7 +215,18 @@ const ProductSearchField = forwardRef<ProductSearchFieldHandle, ProductSearchFie
 
   return (
     <div className="relative">
-      <Search aria-hidden="true" size={16} className="absolute left-3 top-3.5 z-10 text-muted-foreground" />
+      <Search
+        aria-hidden="true"
+        size={16}
+        className="
+          absolute
+          left-3
+          top-3.5
+          z-10
+          text-muted-foreground
+        "
+      />
+
       <Input
         ref={inputRef}
         id={id}
@@ -141,48 +239,162 @@ const ProductSearchField = forwardRef<ProductSearchFieldHandle, ProductSearchFie
         aria-expanded={canSearch}
         aria-controls={`${id}-results`}
         onFocus={() => {
-          if (suppressNextFocusOpenRef.current) {
-            suppressNextFocusOpenRef.current = false;
+          if (
+            suppressNextFocusOpenRef.current
+          ) {
+            suppressNextFocusOpenRef.current =
+              false;
+
             return;
           }
+
           setIsOpen(true);
         }}
         onChange={(event) => {
-          const nextQuery = event.target.value;
+          const nextQuery =
+            event.target.value;
+
           setQuery(nextQuery);
-          if (product) onChange(null);
+
+          if (product) {
+            onChange(null);
+          }
+
           setIsOpen(true);
           setErrorMessage(null);
+
           onQueryChange?.(nextQuery);
         }}
       />
 
       {canSearch && (
-        <div id={`${id}-results`} role="listbox" className="absolute z-20 mt-1.5 max-h-48 w-full overflow-y-auto rounded-[18px] border border-border bg-card p-1.5 shadow-[0_12px_30px_rgba(34,39,34,0.12)]">
+        <div
+          id={`${id}-results`}
+          role="listbox"
+          className="
+            absolute
+            z-20
+            mt-1.5
+            max-h-48
+            w-full
+            overflow-y-auto
+            rounded-[18px]
+            border
+            border-border
+            bg-card
+            p-1.5
+            shadow-[0_12px_30px_rgba(34,39,34,0.12)]
+          "
+        >
           {isSearching ? (
-            <p className="px-3 py-2 text-sm text-muted-foreground">Söker...</p>
+            <p className="px-3 py-2 text-sm text-muted-foreground">
+              Söker...
+            </p>
           ) : (
             <>
+              {canCreate && (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  disabled={isCreating}
+                  onClick={() =>
+                    void handleCreate()
+                  }
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-2
+                    rounded-2xl
+                    px-3
+                    py-2.5
+                    text-left
+                    text-sm
+                    font-medium
+                    text-primary
+                    hover:bg-accent
+                    disabled:opacity-50
+                  "
+                >
+                  <Plus
+                    aria-hidden="true"
+                    size={16}
+                  />
+
+                  {isCreating
+                    ? "Skapar..."
+                    : `Skapa '${trimmedQuery}'`}
+                </button>
+              )}
+
+              {canCreate &&
+                results.length > 0 && (
+                  <div className="mx-2 my-1 border-t border-border" />
+                )}
+
               {results.map((result) => {
-                const isExcluded = excludedProductIds.includes(result.id);
+                const isExcluded =
+                  excludedProductIds.includes(
+                    result.id
+                  );
+
                 return (
-                  <button key={result.id} type="button" role="option" aria-selected="false" aria-disabled={isExcluded} onClick={() => selectProduct(result)} className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm hover:bg-accent aria-disabled:opacity-60">
-                    <span className="truncate font-medium">{result.name}</span>
-                    {isExcluded && <span className="ml-2 text-xs text-muted-foreground">Redan vald</span>}
+                  <button
+                    key={result.id}
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    aria-disabled={isExcluded}
+                    onClick={() =>
+                      selectProduct(result)
+                    }
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      justify-between
+                      rounded-2xl
+                      px-3
+                      py-2.5
+                      text-left
+                      text-sm
+                      hover:bg-accent
+                      aria-disabled:opacity-60
+                    "
+                  >
+                    <span className="truncate font-medium">
+                      {result.name}
+                    </span>
+
+                    {isExcluded && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        Redan vald
+                      </span>
+                    )}
                   </button>
                 );
               })}
-              {!hasExactMatch && (
-                <button type="button" role="option" aria-selected="false" disabled={isCreating} onClick={() => void handleCreate()} className="flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-accent disabled:opacity-50">
-                  <Plus aria-hidden="true" size={16} />
-                  {isCreating ? "Skapar..." : <>Skapa &apos;{trimmedQuery}&apos;</>}
-                </button>
-              )}
+
+              {results.length === 0 &&
+                !canCreate && (
+                  <p className="px-3 py-2 text-sm text-muted-foreground">
+                    Inga produkter hittades.
+                  </p>
+                )}
             </>
           )}
         </div>
       )}
-      {errorMessage && <p role="alert" className="mt-1.5 text-xs text-destructive">{errorMessage}</p>}
+
+      {errorMessage && (
+        <p
+          role="alert"
+          className="mt-1.5 text-xs text-destructive"
+        >
+          {errorMessage}
+        </p>
+      )}
     </div>
   );
 });

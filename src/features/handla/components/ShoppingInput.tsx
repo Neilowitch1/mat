@@ -194,46 +194,65 @@ export default function ShoppingInput({
 
           {isLoading ? (
             <p className="px-3 py-3 text-sm text-muted-foreground">Söker...</p>
-          ) : products.length > 0 ? (
-            products.map((product) => (
-              <button
-                key={product.id}
-                type="button"
-                role="option"
-                aria-selected="false"
-                onClick={() => handleProductSelect(product)}
-                disabled={isSubmitting}
-                className="flex w-full items-center rounded-2xl px-3 py-3 text-left transition hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span className="min-w-0 flex-1 truncate text-base font-medium text-foreground">
-                  {product.name}
-                </span>
-                {product.category && (
-                  <span className="ml-3 shrink-0 text-sm text-muted-foreground">
-                    {product.category}
-                  </span>
-                )}
-                {shoppingProductIds.includes(product.id) && (
-                  <span className="ml-3 shrink-0 text-sm text-[#425b48]">
-                    På listan
-                  </span>
-                )}
-              </button>
-            ))
           ) : (
-            <button
-              type="button"
-              role="option"
-              aria-selected="false"
-              onClick={handleCreateProduct}
-              disabled={isSubmitting}
-              className="flex w-full items-center gap-2 rounded-2xl px-3 py-3 text-left text-base font-medium text-[#425b48] transition hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Plus size={18} aria-hidden="true" />
-              <span>
-                {isSubmitting ? "Lägger till..." : `Skapa ny '${trimmedQuery}'`}
-              </span>
-            </button>
+            <>
+              {!products.some(
+                (product) =>
+                  product.name.trim().toLocaleLowerCase("sv") ===
+                  trimmedQuery.toLocaleLowerCase("sv")
+              ) && (
+                <>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    onClick={handleCreateProduct}
+                    disabled={isSubmitting}
+                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-3 text-left text-base font-medium text-[#425b48] transition hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Plus size={18} aria-hidden="true" />
+
+                    <span>
+                      {isSubmitting
+                        ? "Lägger till..."
+                        : `Skapa ny '${trimmedQuery}'`}
+                    </span>
+                  </button>
+
+                  {products.length > 0 && (
+                    <div className="my-1 border-t border-border" />
+                  )}
+                </>
+              )}
+
+              {products.map((product) => (
+                <button
+                  key={product.id}
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  onClick={() => handleProductSelect(product)}
+                  disabled={isSubmitting}
+                  className="flex w-full items-center rounded-2xl px-3 py-3 text-left transition hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="min-w-0 flex-1 truncate text-base font-medium text-foreground">
+                    {product.name}
+                  </span>
+
+                  {product.category && (
+                    <span className="ml-3 shrink-0 text-sm text-muted-foreground">
+                      {product.category}
+                    </span>
+                  )}
+
+                  {shoppingProductIds.includes(product.id) && (
+                    <span className="ml-3 shrink-0 text-sm text-[#425b48]">
+                      På listan
+                    </span>
+                  )}
+                </button>
+              ))}
+            </>
           )}
         </div>
       )}

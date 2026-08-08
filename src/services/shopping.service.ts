@@ -165,3 +165,14 @@ export async function toggleShoppingItemCompleted(
 
   return data;
 }
+
+export async function clearShoppingList(): Promise<void> {
+  const { error } = await supabase
+    .from("shopping_list")
+    .delete()
+    .not("id", "is", null);
+
+  if (error) {
+    throw error;
+  }
+}
