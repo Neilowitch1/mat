@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
 import { Button } from "@/components/ui/button";
+import ScrollToTopButton from "@/components/ScrollToTopButton";
 
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
@@ -39,11 +40,18 @@ interface InventoryListProps {
   initialInventoryItems: InventoryItem[];
 }
 
+type ProductInventoryGroup = {
+  key: string;
+  productId: string;
+  location: InventoryLocation;
+  items: InventoryItem[];
+};
+
 type InventoryDisplayGroup = {
   value: string;
   label: string;
   className: string;
-  items: InventoryItem[];
+  productGroups: ProductInventoryGroup[];
 };
 
 const urgentExpirationGroups: Array<{
@@ -105,14 +113,43 @@ const statusGroups: Array<{
   },
 ];
 
+const expirationPriority: Record<InventoryExpirationGroup, number> = {
+  expired: 0,
+  today: 1,
+  soon: 2,
+  thisWeek: 3,
+  later: 4,
+  none: 5,
+};
+
+const statusPriority: Record<InventoryStatus, number> = {
+  empty: 0,
+  low: 1,
+  half: 2,
+  three_quarters: 3,
+  full: 4,
+};
+
 function compareInventoryItems(
   firstItem: InventoryItem,
   secondItem: InventoryItem
 ) {
-  /*
-   * Om båda har bäst före:
-   * närmaste datum först.
-   */
+  const firstExpiration = classifyInventoryExpiration(
+    firstItem.expires_at
+  );
+
+  const secondExpiration = classifyInventoryExpiration(
+    secondItem.expires_at
+  );
+
+  const expirationComparison =
+    expirationPriority[firstExpiration] -
+    expirationPriority[secondExpiration];
+
+  if (expirationComparison !== 0) {
+    return expirationComparison;
+  }
+
   if (firstItem.expires_at && secondItem.expires_at) {
     const dateComparison = firstItem.expires_at.localeCompare(
       secondItem.expires_at
@@ -123,21 +160,14 @@ function compareInventoryItems(
     }
   }
 
-  /*
-   * Om endast en har bäst före:
-   * den med datum visas först.
-   */
-  if (firstItem.expires_at && !secondItem.expires_at) {
-    return -1;
+  const statusComparison =
+    statusPriority[firstItem.status] -
+    statusPriority[secondItem.status];
+
+  if (statusComparison !== 0) {
+    return statusComparison;
   }
 
-  if (!firstItem.expires_at && secondItem.expires_at) {
-    return 1;
-  }
-
-  /*
-   * Slutligen alfabetiskt på svenska.
-   */
   return (firstItem.product?.name ?? "").localeCompare(
     secondItem.product?.name ?? "",
     "sv",
@@ -145,6 +175,195 @@ function compareInventoryItems(
       sensitivity: "base",
     }
   );
+}
+
+function groupItemsByProductAndLocation(
+  items: InventoryItem[]
+): ProductInventoryGroup[] {
+  const groups = new Map<string, ProductInventoryGroup>();
+
+  for (const item of items) {
+    const key = `${item.product_id}-${item.location}`;
+
+    const existingGroup = groups.get(key);
+
+    if (existingGroup) {
+      existingGroup.items.push(item);
+      continue;
+    }
+
+    groups.set(key, {
+      key,
+      productId: item.product_id,
+      location: item.location,
+      items: [item],
+    });
+  }
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    items: [...group.items].sort(compareInventoryItems),
+  }));
+}
+
+function getProductGroupExpiration(
+  group: ProductInventoryGroup
+): InventoryExpirationGroup {
+  let mostUrgentGroup: InventoryExpirationGroup = "none";
+
+  for (const item of group.items) {
+    const expirationGroup = classifyInventoryExpiration(
+      item.expires_at
+    );
+
+    if (
+      expirationPriority[expirationGroup] <
+      expirationPriority[mostUrgentGroup]
+    ) {
+      mostUrgentGroup = expirationGroup;
+    }
+  }
+
+  return mostUrgentGroup;
+}
+
+function getProductGroupStatus(
+  group: ProductInventoryGroup
+): InventoryStatus {
+  /*
+   * På produktnivå använder vi den högsta
+   * tillgängliga statusen bland batcherna.
+   *
+   * Exempel:
+   * Full + Lite kvar -> Full
+   * Halv + Slut -> Halv
+   * Lite kvar + Slut -> Lite kvar
+   *
+   * Detta gör att produkten inte markeras
+   * som "Lite kvar" om det fortfarande finns
+   * en full förpackning hemma.
+   */
+  let highestAvailableStatus: InventoryStatus = "empty";
+
+  for (const item of group.items) {
+    if (
+      statusPriority[item.status] >
+      statusPriority[highestAvailableStatus]
+    ) {
+      highestAvailableStatus = item.status;
+    }
+  }
+
+  return highestAvailableStatus;
+}
+
+function getEarliestExpiration(
+  group: ProductInventoryGroup
+): string | null {
+  const dates = group.items
+    .map((item) => item.expires_at)
+    .filter((date): date is string => Boolean(date))
+    .sort();
+
+  return dates[0] ?? null;
+}
+
+function compareProductGroups(
+  firstGroup: ProductInventoryGroup,
+  secondGroup: ProductInventoryGroup
+) {
+  const firstDate = getEarliestExpiration(firstGroup);
+  const secondDate = getEarliestExpiration(secondGroup);
+
+  if (firstDate && secondDate) {
+    const dateComparison = firstDate.localeCompare(secondDate);
+
+    if (dateComparison !== 0) {
+      return dateComparison;
+    }
+  }
+
+  if (firstDate && !secondDate) {
+    return -1;
+  }
+
+  if (!firstDate && secondDate) {
+    return 1;
+  }
+
+  const firstName =
+    firstGroup.items[0]?.product?.name ?? "";
+
+  const secondName =
+    secondGroup.items[0]?.product?.name ?? "";
+
+  return firstName.localeCompare(secondName, "sv", {
+    sensitivity: "base",
+  });
+}
+
+function getPluralUnitLabel(
+  unit: string,
+  quantity: number
+): string {
+  const normalizedUnit = unit.trim();
+
+  const pluralLabels: Record<string, string> = {
+    st: "st",
+    Burk: "burkar",
+    Flaska: "flaskor",
+    Förpackning: "förpackningar",
+    Paket: "paket",
+    Påse: "påsar",
+    Ask: "askar",
+    Kartong: "kartonger",
+    Tub: "tuber",
+    Rulle: "rullar",
+    Limpa: "limpor",
+  };
+
+  if (quantity === 1) {
+    return normalizedUnit;
+  }
+
+  return pluralLabels[normalizedUnit] ?? normalizedUnit;
+}
+
+function getProductGroupQuantityLabel(
+  group: ProductInventoryGroup
+): string {
+  const units = group.items.map((item) =>
+    item.unit?.trim() || "st"
+  );
+
+  const uniqueUnits = Array.from(
+    new Set(units)
+  );
+
+  /*
+   * Om batcherna har olika enheter
+   * kan vi inte ge en vettig gemensam
+   * enhetsbeskrivning.
+   */
+  if (uniqueUnits.length !== 1) {
+    return `${group.items.length} enheter`;
+  }
+
+  const unit = uniqueUnits[0];
+
+  /*
+   * För batchprodukter använder vi antalet
+   * separata batcher som antal.
+   *
+   * Ex:
+   * 2 inventory-rader med Burk => 2 burkar.
+   */
+  const count = group.items.length;
+
+  return `${count} ${getPluralUnitLabel(
+    unit,
+    count
+  )}`;
 }
 
 export default function InventoryList({
@@ -168,6 +387,9 @@ export default function InventoryList({
     message: string;
   } | null>(null);
 
+  const [expandedBatchId, setExpandedBatchId] =
+    useState<string | null>(null);
+
   const realtimeVersions = useRef(
     new Map<string, number>()
   );
@@ -190,26 +412,22 @@ export default function InventoryList({
   }, [router, searchParams]);
 
   function focusInventoryItem(id: string) {
-    const inventoryItem =
-      inventoryItems.find(
-        (item) => item.id === id
-      );
+    const inventoryItem = inventoryItems.find(
+      (item) => item.id === id
+    );
 
     if (
       inventoryItem &&
       locationFilter !== "all" &&
       locationFilter !== inventoryItem.location
     ) {
-      setLocationFilter(
-        inventoryItem.location
-      );
+      setLocationFilter(inventoryItem.location);
     }
 
     requestAnimationFrame(() => {
-      const row =
-        document.getElementById(
-          `inventory-item-${id}`
-        );
+      const row = document.getElementById(
+        `inventory-item-${id}`
+      );
 
       row?.scrollIntoView({
         behavior: "smooth",
@@ -222,127 +440,91 @@ export default function InventoryList({
     });
   }
 
-  useRealtimeTable(
-    "inventory",
-    async (change) => {
-      const record =
-        change.eventType === "DELETE"
-          ? change.old
-          : change.new;
+  useRealtimeTable("inventory", async (change) => {
+    const record =
+      change.eventType === "DELETE"
+        ? change.old
+        : change.new;
 
-      const id =
-        typeof record.id === "string"
-          ? record.id
-          : null;
+    const id =
+      typeof record.id === "string"
+        ? record.id
+        : null;
 
-      if (!id) {
-        return;
-      }
+    if (!id) {
+      return;
+    }
 
-      const version =
-        (realtimeVersions.current.get(id) ??
-          0) + 1;
+    const version =
+      (realtimeVersions.current.get(id) ?? 0) + 1;
 
-      realtimeVersions.current.set(
-        id,
-        version
+    realtimeVersions.current.set(id, version);
+
+    if (change.eventType === "DELETE") {
+      setInventoryItems((currentItems) =>
+        currentItems.filter((item) => item.id !== id)
       );
 
-      if (change.eventType === "DELETE") {
-        setInventoryItems(
-          (currentItems) =>
-            currentItems.filter(
-              (item) => item.id !== id
-            )
-        );
+      return;
+    }
 
+    try {
+      const realtimeItem = await getInventoryItem(id);
+
+      if (
+        realtimeVersions.current.get(id) !== version
+      ) {
         return;
       }
 
-      try {
-        const realtimeItem =
-          await getInventoryItem(id);
-
-        if (
-          realtimeVersions.current.get(id) !==
-          version
-        ) {
-          return;
+      setInventoryItems((currentItems) => {
+        if (!realtimeItem) {
+          return currentItems.filter(
+            (item) => item.id !== id
+          );
         }
 
-        setInventoryItems(
-          (currentItems) => {
-            if (!realtimeItem) {
-              return currentItems.filter(
-                (item) =>
-                  item.id !== id
-              );
-            }
-
-            const itemExists =
-              currentItems.some(
-                (item) =>
-                  item.id === id
-              );
-
-            return itemExists
-              ? currentItems.map(
-                  (item) =>
-                    item.id === id
-                      ? realtimeItem
-                      : item
-                )
-              : [
-                  ...currentItems,
-                  realtimeItem,
-                ];
-          }
+        const itemExists = currentItems.some(
+          (item) => item.id === id
         );
-      } catch {
-        return;
-      }
+
+        return itemExists
+          ? currentItems.map((item) =>
+              item.id === id ? realtimeItem : item
+            )
+          : [...currentItems, realtimeItem];
+      });
+    } catch {
+      return;
     }
-  );
+  });
 
   function handleInventoryItemChange(
     updatedItem: InventoryItem
   ) {
-    setInventoryItems(
-      (currentItems) =>
-        currentItems.map((item) =>
-          item.id === updatedItem.id
-            ? updatedItem
-            : item
-        )
+    setInventoryItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === updatedItem.id ? updatedItem : item
+      )
     );
   }
 
   function handleInventoryItemAdded(
     inventoryItem: InventoryItem
   ) {
-    setInventoryItems(
-      (currentItems) => {
-        const itemExists =
-          currentItems.some(
-            (item) =>
-              item.id ===
-              inventoryItem.id
-          );
+    setInventoryItems((currentItems) => {
+      const itemExists = currentItems.some(
+        (item) => item.id === inventoryItem.id
+      );
 
-        return itemExists
-          ? currentItems.map(
-              (item) =>
-                item.id ===
-                inventoryItem.id
-                  ? inventoryItem
-                  : item
-            )
-          : [
-              ...currentItems,
-              inventoryItem,
-            ];
-      }
-    );
+      return itemExists
+        ? currentItems.map((item) =>
+            item.id === inventoryItem.id
+              ? inventoryItem
+              : item
+          )
+        : [...currentItems, inventoryItem];
+    });
   }
 
   async function handleInventoryItemDelete(
@@ -352,58 +534,41 @@ export default function InventoryList({
       return;
     }
 
-    const itemIndex =
-      inventoryItems.findIndex(
-        (item) =>
-          item.id ===
-          inventoryItem.id
-      );
-
-    setDeletingItemId(
-      inventoryItem.id
+    const itemIndex = inventoryItems.findIndex(
+      (item) => item.id === inventoryItem.id
     );
 
+    setDeletingItemId(inventoryItem.id);
     setDeleteError(null);
 
-    setInventoryItems(
-      (currentItems) =>
-        currentItems.filter(
-          (item) =>
-            item.id !==
-            inventoryItem.id
-        )
+    setInventoryItems((currentItems) =>
+      currentItems.filter(
+        (item) => item.id !== inventoryItem.id
+      )
     );
 
     try {
-      await removeInventoryItem(
-        inventoryItem.id
-      );
+      await removeInventoryItem(inventoryItem.id);
     } catch {
-      setInventoryItems(
-        (currentItems) => {
-          if (
-            currentItems.some(
-              (item) =>
-                item.id ===
-                inventoryItem.id
-            )
-          ) {
-            return currentItems;
-          }
-
-          const restoredItems = [
-            ...currentItems,
-          ];
-
-          restoredItems.splice(
-            Math.max(itemIndex, 0),
-            0,
-            inventoryItem
-          );
-
-          return restoredItems;
+      setInventoryItems((currentItems) => {
+        if (
+          currentItems.some(
+            (item) => item.id === inventoryItem.id
+          )
+        ) {
+          return currentItems;
         }
-      );
+
+        const restoredItems = [...currentItems];
+
+        restoredItems.splice(
+          Math.max(itemIndex, 0),
+          0,
+          inventoryItem
+        );
+
+        return restoredItems;
+      });
 
       setDeleteError({
         itemId: inventoryItem.id,
@@ -415,133 +580,133 @@ export default function InventoryList({
     }
   }
 
-  const groupedInventoryItems =
-    useMemo(() => {
-      const filteredItems =
-        locationFilter === "all"
-          ? inventoryItems
-          : inventoryItems.filter(
-              (item) =>
-                item.location ===
-                locationFilter
-            );
-
-      /*
-       * Vi håller reda på vilka poster som
-       * redan placerats i en akut
-       * bäst-före-grupp.
-       */
-      const handledItemIds =
-        new Set<string>();
-
-      const groups: InventoryDisplayGroup[] =
-        [];
-
-      /*
-       * 1. Akuta bäst-före-grupper.
-       *
-       * Dessa har alltid högsta prioritet
-       * oavsett status.
-       */
-      for (const group of urgentExpirationGroups) {
-        const items = filteredItems
-          .filter((item) => {
-            return (
-              classifyInventoryExpiration(
-                item.expires_at
-              ) === group.value
-            );
-          })
-          .sort(compareInventoryItems);
-
-        if (items.length === 0) {
-          continue;
-        }
-
-        for (const item of items) {
-          handledItemIds.add(
-            item.id
-          );
-        }
-
-        groups.push({
-          ...group,
-          items,
-        });
-      }
-
-      /*
-       * 2. Alla återstående produkter
-       * grupperas efter status.
-       *
-       * "Senare" och "Inget bäst före"
-       * blir alltså inte egna stora grupper
-       * längre.
-       */
-      const remainingItems =
-        filteredItems.filter(
-          (item) =>
-            !handledItemIds.has(
-              item.id
-            )
-        );
-
-      for (const group of statusGroups) {
-        const items = remainingItems
-          .filter(
-            (item) =>
-              item.status ===
-              group.value
-          )
-          .sort(
-            compareInventoryItems
+  const filteredProductGroups = useMemo(() => {
+    const filteredItems =
+      locationFilter === "all"
+        ? inventoryItems
+        : inventoryItems.filter(
+            (item) => item.location === locationFilter
           );
 
-        if (items.length === 0) {
-          continue;
-        }
+    return groupItemsByProductAndLocation(filteredItems);
+  }, [inventoryItems, locationFilter]);
 
-        groups.push({
-          ...group,
-          items,
-        });
+  const groupedInventoryItems = useMemo(() => {
+    const handledGroupKeys = new Set<string>();
+
+    const groups: InventoryDisplayGroup[] = [];
+
+    /*
+     * 1. Bäst före har högsta prioritet.
+     *
+     * Om EN förpackning av Mjölk går ut idag
+     * hamnar hela Mjölk-gruppen under
+     * "Går ut idag".
+     */
+    for (const expirationOption of urgentExpirationGroups) {
+      const productGroups = filteredProductGroups
+        .filter(
+          (group) =>
+            getProductGroupExpiration(group) ===
+            expirationOption.value
+        )
+        .sort(compareProductGroups);
+
+      if (productGroups.length === 0) {
+        continue;
       }
 
-      return groups;
-    }, [
-      inventoryItems,
-      locationFilter,
-    ]);
+      for (const group of productGroups) {
+        handledGroupKeys.add(group.key);
+      }
 
-  const filteredInventoryItemCount =
+      groups.push({
+        ...expirationOption,
+        productGroups,
+      });
+    }
+
+    /*
+     * 2. Resterande produkter sorteras efter
+     * den mest akuta statusen bland batcherna.
+     *
+     * Exempel:
+     * Mjölk:
+     * - Full
+     * - Lite kvar
+     *
+     * -> hela Mjölk-gruppen hamnar under
+     * "Lite kvar".
+     */
+    const remainingGroups = filteredProductGroups.filter(
+      (group) => !handledGroupKeys.has(group.key)
+    );
+
+    for (const statusOption of statusGroups) {
+      const productGroups = remainingGroups
+        .filter(
+          (group) =>
+            getProductGroupStatus(group) ===
+            statusOption.value
+        )
+        .sort(compareProductGroups);
+
+      if (productGroups.length === 0) {
+        continue;
+      }
+
+      groups.push({
+        ...statusOption,
+        productGroups,
+      });
+    }
+
+    return groups;
+  }, [filteredProductGroups]);
+
+  const visibleProductCount =
     groupedInventoryItems.reduce(
       (count, group) =>
-        count + group.items.length,
+        count + group.productGroups.length,
       0
     );
+
+  /*
+   * Search visar nu en träff per produkt + plats
+   * istället för en identisk träff per batch.
+   */
+  const searchProductGroups = useMemo(
+    () => groupItemsByProductAndLocation(inventoryItems),
+    [inventoryItems]
+  );
 
   return (
     <>
       <ListSearchSheet
         open={isSearchOpen}
-        onOpenChange={
-          setIsSearchOpen
-        }
+        onOpenChange={setIsSearchOpen}
         title="Sök hemma"
         placeholder="Sök bland det du har hemma..."
-        items={inventoryItems.map(
-          (item) => ({
-            id: item.id,
+        items={searchProductGroups.map((group) => {
+          const firstItem = group.items[0];
+
+          return {
+            id: firstItem.id,
             label:
-              item.product?.name ??
+              firstItem.product?.name ??
               "Okänd produkt",
-            description: `${item.quantity} ${item.unit}`,
-          })
-        )}
+            description:
+              group.items.length > 1
+                ? `${group.items.length} förpackningar · ${
+                    inventoryLocationLabels[group.location]
+                  }`
+                : `${firstItem.quantity} ${firstItem.unit} · ${
+                    inventoryLocationLabels[group.location]
+                  }`,
+          };
+        })}
         onSelect={(item) =>
-          focusInventoryItem(
-            item.id
-          )
+          focusInventoryItem(item.id)
         }
       />
 
@@ -569,8 +734,7 @@ export default function InventoryList({
             </h2>
 
             <p className="mt-1 max-w-56 text-sm leading-6 text-muted-foreground">
-              Lägg till det du har hemma
-              för att komma igång.
+              Lägg till det du har hemma för att komma igång.
             </p>
           </div>
         </AppCard>
@@ -586,17 +750,12 @@ export default function InventoryList({
                 type="button"
                 variant="ghost"
                 size="sm"
-                aria-pressed={
-                  locationFilter === "all"
-                }
+                aria-pressed={locationFilter === "all"}
                 onClick={() =>
-                  setLocationFilter(
-                    "all"
-                  )
+                  setLocationFilter("all")
                 }
                 className={`h-9 rounded-[14px] px-2 text-xs ${
-                  locationFilter ===
-                  "all"
+                  locationFilter === "all"
                     ? "bg-card text-primary shadow-sm hover:bg-card"
                     : "text-muted-foreground hover:bg-card/70"
                 }`}
@@ -604,129 +763,194 @@ export default function InventoryList({
                 Alla
               </Button>
 
-              {inventoryLocations.map(
-                (location) => {
-                  const LocationIcon =
-                    inventoryLocationIcons[
-                      location.value
-                    ];
+              {inventoryLocations.map((location) => {
+                const LocationIcon =
+                  inventoryLocationIcons[
+                    location.value
+                  ];
 
-                  return (
-                    <Button
-                      key={
-                        location.value
-                      }
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      aria-pressed={
-                        locationFilter ===
-                        location.value
-                      }
-                      onClick={() =>
-                        setLocationFilter(
-                          location.value
-                        )
-                      }
-                      className={`h-9 gap-1 rounded-[14px] px-1.5 text-xs ${
-                        locationFilter ===
-                        location.value
-                          ? "bg-card text-primary shadow-sm hover:bg-card"
-                          : "text-muted-foreground hover:bg-card/70"
-                      }`}
-                    >
-                      <LocationIcon
-                        aria-hidden="true"
-                        className="size-3.5"
-                      />
+                return (
+                  <Button
+                    key={location.value}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-pressed={
+                      locationFilter === location.value
+                    }
+                    onClick={() =>
+                      setLocationFilter(location.value)
+                    }
+                    className={`h-9 gap-1 rounded-[14px] px-1.5 text-xs ${
+                      locationFilter === location.value
+                        ? "bg-card text-primary shadow-sm hover:bg-card"
+                        : "text-muted-foreground hover:bg-card/70"
+                    }`}
+                  >
+                    <LocationIcon
+                      aria-hidden="true"
+                      className="size-3.5"
+                    />
 
-                      {
-                        inventoryLocationLabels[
-                          location
-                            .value
-                        ]
-                      }
-                    </Button>
-                  );
-                }
-              )}
+                    {
+                      inventoryLocationLabels[
+                        location.value
+                      ]
+                    }
+                  </Button>
+                );
+              })}
             </div>
           </fieldset>
 
-          {filteredInventoryItemCount ===
-          0 ? (
+          {visibleProductCount === 0 ? (
             <AppCard className="py-6 text-center text-sm text-muted-foreground">
-              Inga produkter på den här
-              platsen.
+              Inga produkter på den här platsen.
             </AppCard>
           ) : (
             <div className="space-y-4">
-              {groupedInventoryItems.map(
-                (group) => (
-                  <section
-                    key={
-                      group.value
-                    }
-                    aria-labelledby={`inventory-group-${group.value}`}
+              {groupedInventoryItems.map((group) => (
+                <section
+                  key={group.value}
+                  aria-labelledby={`inventory-group-${group.value}`}
+                >
+                  <h2
+                    id={`inventory-group-${group.value}`}
+                    className={`mb-1.5 px-1 text-[0.7rem] font-semibold uppercase tracking-[0.08em] ${group.className}`}
                   >
-                    <h2
-                      id={`inventory-group-${group.value}`}
-                      className={`mb-1.5 px-1 text-[0.7rem] font-semibold uppercase tracking-[0.08em] ${group.className}`}
-                    >
-                      {
-                        group.label
-                      }
-                    </h2>
+                    {group.label}
+                  </h2>
 
-                    <div className="space-y-2">
-                      {group.items.map(
-                        (item) => (
-                          <div
-                            key={
-                              item.id
-                            }
-                            id={`inventory-item-${item.id}`}
-                            tabIndex={
-                              -1
-                            }
-                            className="scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                  <div className="space-y-2">
+                    {group.productGroups.map(
+                      (productGroup) => {
+                        const firstItem =
+                          productGroup.items[0];
+
+                        /*
+                         * En enda post:
+                         * behåll det vanliga kortet exakt som tidigare.
+                         */
+                        if (
+                          productGroup.items.length === 1
+                        ) {
+                          return (
+                            <div
+                              key={productGroup.key}
+                              id={`inventory-item-${firstItem.id}`}
+                              tabIndex={-1}
+                              className="scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                            >
+                              <InventoryItemRow
+                                item={firstItem}
+                                onItemChange={
+                                  handleInventoryItemChange
+                                }
+                                onDelete={
+                                  handleInventoryItemDelete
+                                }
+                                deleteDisabled={Boolean(
+                                  deletingItemId
+                                )}
+                                deleteErrorMessage={
+                                  deleteError?.itemId ===
+                                  firstItem.id
+                                    ? deleteError.message
+                                    : undefined
+                                }
+                              />
+                            </div>
+                          );
+                        }
+
+                        const LocationIcon =
+                          inventoryLocationIcons[
+                            productGroup.location
+                          ];
+
+                        /*
+                         * Flera batcher:
+                         * ett gemensamt produktkort.
+                         */
+                        return (
+                          <AppCard
+                            key={productGroup.key}
+                            className="p-3.5"
                           >
-                            <InventoryItemRow
-                              item={
-                                item
-                              }
-                              onItemChange={
-                                handleInventoryItemChange
-                              }
-                              onDelete={
-                                handleInventoryItemDelete
-                              }
-                              deleteDisabled={Boolean(
-                                deletingItemId
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h3 className="truncate text-[1.0625rem] font-semibold tracking-[-0.01em] text-foreground">
+                                  {firstItem.product?.name ??
+                                    "Okänd produkt"}
+                                </h3>
+
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {getProductGroupQuantityLabel(productGroup)}
+                                </p>
+                              </div>
+
+                              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
+                                <LocationIcon
+                                  aria-hidden="true"
+                                  className="size-3.5"
+                                />
+
+                                {
+                                  inventoryLocationLabels[
+                                    productGroup.location
+                                  ]
+                                }
+                              </span>
+                            </div>
+
+                            <div className="space-y-2">
+                              {productGroup.items.map(
+                                (item, index) => (
+                                  <div
+                                    key={item.id}
+                                    id={`inventory-item-${item.id}`}
+                                    tabIndex={-1}
+                                    className="scroll-mt-24 rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                                  >
+                                    <InventoryItemRow
+                                      embedded
+                                      expanded={expandedBatchId === item.id}
+                                      onToggleExpanded={() =>
+                                        setExpandedBatchId((current) =>
+                                          current === item.id ? null : item.id
+                                        )
+                                      }
+                                      batchNumber={index + 1}
+                                      item={item}
+                                      onItemChange={handleInventoryItemChange}
+                                      onDelete={handleInventoryItemDelete}
+                                      deleteDisabled={Boolean(deletingItemId)}
+                                      deleteErrorMessage={
+                                        deleteError?.itemId === item.id
+                                          ? deleteError.message
+                                          : undefined
+                                      }
+                                    />
+                                  </div>
+                                )
                               )}
-                              deleteErrorMessage={
-                                deleteError?.itemId ===
-                                item.id
-                                  ? deleteError.message
-                                  : undefined
-                              }
-                            />
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </section>
-                )
-              )}
+                            </div>
+                          </AppCard>
+                        );
+                      }
+                    )}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </section>
       )}
 
+      <ScrollToTopButton />
+
       <AddInventorySheet
-        onInventoryItemAdded={
-          handleInventoryItemAdded
-        }
+        onInventoryItemAdded={handleInventoryItemAdded}
       />
     </>
   );
