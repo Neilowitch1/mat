@@ -12,6 +12,7 @@ export type CreateRecipeInput = Pick<Recipe, "name"> &
       | "prep_time_minutes"
       | "image_url"
       | "favorite"
+      | "category"
     >
   >;
 
@@ -19,7 +20,7 @@ export type UpdateRecipeInput = Partial<CreateRecipeInput>;
 
 export interface RecipeIngredientInput {
   productId: string;
-  amount: number | null;
+  amount: string | null;
   unit: string | null;
 }
 
@@ -75,6 +76,7 @@ export async function createRecipe({
   prep_time_minutes = null,
   image_url = null,
   favorite = false,
+  category = "cooking",
 }: CreateRecipeInput): Promise<Recipe> {
   const { data, error } = await supabase
     .from("recipes")
@@ -86,6 +88,7 @@ export async function createRecipe({
       prep_time_minutes,
       image_url,
       favorite,
+      category,
     })
     .select()
     .single();
@@ -212,6 +215,125 @@ export async function deleteRecipeIngredient(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw error;
+}
+
+export async function saveRecipeIngredients(
+  recipeId: string,
+  ingredients: RecipeIngredientInput[]
+): Promise<RecipeIngredient[]> {
+  /*
+   * Spara en kopia av nuvarande ingredienser
+   * så att vi kan försöka återställa dem om
+   * något går fel.
+   */
+  const { data: previousIngredients, error: readError } =
+    await supabase
+      .from("recipe_ingredients")
+      .select("product_id, amount, unit")
+      .eq("recipe_id", recipeId);
+
+  if (readError) throw readError;
+
+  try {
+    /*
+     * Hela ingredienslistan ersätts vid
+     * "Spara recept".
+     *
+     * Det gör att nya, ändrade och borttagna
+     * ingredienser hanteras i samma flöde.
+     */
+    const { error: deleteError } = await supabase
+      .from("recipe_ingredients")
+      .delete()
+      .eq("recipe_id", recipeId);
+
+    if (deleteError) throw deleteError;
+
+    if (ingredients.length === 0) {
+      const { error: recipeUpdateError } = await supabase
+        .from("recipes")
+        .update({
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", recipeId);
+
+      if (recipeUpdateError) {
+        throw recipeUpdateError;
+      }
+
+      return [];
+    }
+
+    const { data: savedIngredients, error: insertError } =
+      await supabase
+        .from("recipe_ingredients")
+        .insert(
+          ingredients.map((ingredient) => ({
+            recipe_id: recipeId,
+            product_id: ingredient.productId,
+            amount: ingredient.amount,
+            unit: ingredient.unit,
+          }))
+        )
+        .select(`
+          *,
+          product:products(*)
+        `);
+
+    if (insertError) throw insertError;
+
+    await updateIngredientDefaultUnits(ingredients);
+
+    const { error: recipeUpdateError } = await supabase
+      .from("recipes")
+      .update({
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", recipeId);
+
+    if (recipeUpdateError) {
+      throw recipeUpdateError;
+    }
+
+    return savedIngredients ?? [];
+  } catch (saveError) {
+    /*
+     * Försök återställa den gamla
+     * ingredienslistan om sparningen
+     * misslyckades.
+     */
+    const { error: cleanupError } = await supabase
+      .from("recipe_ingredients")
+      .delete()
+      .eq("recipe_id", recipeId);
+
+    if (cleanupError) {
+      throw new Error(
+        "Receptet kunde inte sparas och ingredienserna kunde inte återställas."
+      );
+    }
+
+    if (previousIngredients && previousIngredients.length > 0) {
+      const { error: rollbackError } = await supabase
+        .from("recipe_ingredients")
+        .insert(
+          previousIngredients.map((ingredient) => ({
+            recipe_id: recipeId,
+            product_id: ingredient.product_id,
+            amount: ingredient.amount,
+            unit: ingredient.unit,
+          }))
+        );
+
+      if (rollbackError) {
+        throw new Error(
+          "Receptet kunde inte sparas och ingredienserna kunde inte återställas."
+        );
+      }
+    }
+
+    throw saveError;
+  }
 }
 
 export async function updateRecipe(

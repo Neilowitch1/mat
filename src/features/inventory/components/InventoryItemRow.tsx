@@ -41,8 +41,8 @@ interface InventoryItemRowProps {
   onDelete: (item: InventoryItem) => void;
   deleteDisabled: boolean;
   deleteErrorMessage?: string;
+  updateFeedbackMessage?: string;
   embedded?: boolean;
-  batchNumber?: number;
 
   expanded?: boolean;
   onToggleExpanded?: () => void;
@@ -68,8 +68,8 @@ export default function InventoryItemRow({
   onDelete,
   deleteDisabled,
   deleteErrorMessage,
+  updateFeedbackMessage,
   embedded = false,
-  batchNumber,
   expanded = false,
   onToggleExpanded,
 }: InventoryItemRowProps) {
@@ -403,6 +403,16 @@ export default function InventoryItemRow({
 
   const feedback = (
     <>
+      {updateFeedbackMessage && !errorMessage && (
+        <p
+          aria-live="polite"
+          className="mt-2 text-xs font-medium text-primary/70"
+        >
+          <Check aria-hidden="true" className="mr-1 inline size-3.5" />
+          {updateFeedbackMessage}
+        </p>
+      )}
+
       {errorMessage && (
         <p
           role="alert"

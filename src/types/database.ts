@@ -1,4 +1,10 @@
-export type InventoryLocation = "fridge" | "freezer" | "pantry";
+export type InventoryLocation =
+  | "fridge"
+  | "freezer"
+  | "pantry"
+  | "spices";
+
+export type RecipeCategory = "cooking" | "baking";
 
 export type InventoryStatus =
   | "full"
@@ -48,6 +54,7 @@ export interface Recipe {
   prep_time_minutes: number | null;
   image_url: string | null;
   favorite: boolean;
+  category: RecipeCategory;
   created_at: string;
   updated_at: string;
 
@@ -58,7 +65,7 @@ export interface RecipeIngredient {
   id: string;
   recipe_id: string;
   product_id: string;
-  amount: number | null;
+  amount: string | null;
   unit: string | null;
   created_at: string;
 

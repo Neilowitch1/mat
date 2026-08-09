@@ -1,15 +1,16 @@
 "use client";
 
-import { BookOpen, Clock, Heart, Plus, Users } from "lucide-react";
+import { BookOpen, CakeSlice, Clock, Heart, ListChecks, Plus, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
+import ScrollToTopButton from "@/components/ScrollToTopButton";
 import { Button } from "@/components/ui/button";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { getInventory } from "@/services/inventory.service";
-import type { InventoryItem, Product, Recipe } from "@/types/database";
+import type { InventoryItem, Product, Recipe, RecipeCategory } from "@/types/database";
 import { rankRecipeSuggestions } from "../recipeAvailability";
 import CreateRecipeSheet from "./CreateRecipeSheet";
 import FindRecipes from "./FindRecipes";
@@ -21,16 +22,22 @@ interface RecipeListProps {
   products: Product[];
 }
 
+function formatIngredientCount(count: number): string {
+  return `${count} ${count === 1 ? "ingrediens" : "ingredienser"}`;
+}
+
 export default function RecipeList({ initialRecipes, initialInventoryItems, products }: RecipeListProps) {
   const [recipes, setRecipes] = useState(initialRecipes);
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
-  const [activeTab, setActiveTab] = useState<"mine" | "find">("mine");
+  const [activeTab, setActiveTab] = useState<"mine" | "baking" | "find">("mine");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const inventoryVersion = useRef(0);
-  const rankedSuggestions = rankRecipeSuggestions(recipes, inventoryItems);
+  const activeCategory: RecipeCategory = activeTab === "baking" ? "baking" : "cooking";
+  const visibleRecipes = recipes.filter((recipe) => recipe.category === activeCategory);
+  const rankedSuggestions = rankRecipeSuggestions(visibleRecipes, inventoryItems);
   const suggestions = rankedSuggestions.slice(0, 5);
   const availabilityByRecipeId = new Map(
     rankedSuggestions.map((suggestion) => [suggestion.recipe.id, suggestion])
@@ -69,15 +76,23 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
         onOpenChange={setIsSearchOpen}
         title="Sök recept"
         placeholder="Sök bland dina recept..."
-        items={recipes.map((recipe) => ({
+        items={visibleRecipes.map((recipe) => ({
           id: recipe.id,
           label: recipe.name,
-          description: `${recipe.servings} portioner`,
+          description: [
+            `${recipe.servings} portioner`,
+            recipe.prep_time_minutes !== null
+              ? `${recipe.prep_time_minutes} min`
+              : null,
+            formatIngredientCount(recipe.ingredients?.length ?? 0),
+          ]
+            .filter((value): value is string => value !== null)
+            .join(" • "),
         }))}
         onSelect={(item) => router.push(`/recept/${item.id}`)}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-0.5 rounded-[18px] bg-secondary p-0.5" role="tablist" aria-label="Receptvy">
+      <div className="mb-4 grid grid-cols-3 gap-0.5 rounded-[18px] bg-secondary p-0.5" role="tablist" aria-label="Receptvy">
         <Button
           type="button"
           role="tab"
@@ -87,6 +102,16 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
           className={`h-9 rounded-[14px] text-sm ${activeTab === "mine" ? "bg-card text-primary shadow-sm hover:bg-card" : "text-muted-foreground"}`}
         >
           Mina recept
+        </Button>
+        <Button
+          type="button"
+          role="tab"
+          variant="ghost"
+          aria-selected={activeTab === "baking"}
+          onClick={() => setActiveTab("baking")}
+          className={`h-9 rounded-[14px] px-2 text-sm ${activeTab === "baking" ? "bg-card text-primary shadow-sm hover:bg-card" : "text-muted-foreground"}`}
+        >
+          Bakrecept
         </Button>
         <Button
           type="button"
@@ -102,19 +127,19 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
 
       {activeTab === "find" ? (
         <FindRecipes inventoryItems={inventoryItems} products={products} />
-      ) : recipes.length === 0 ? (
+      ) : visibleRecipes.length === 0 ? (
         <AppCard>
           <div className="flex flex-col items-center px-3 py-8 text-center">
             <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#eee7f4] text-[#7c5e9e]">
-              <BookOpen aria-hidden="true" size={22} />
+              {activeTab === "baking" ? <CakeSlice aria-hidden="true" size={22} /> : <BookOpen aria-hidden="true" size={22} />}
             </div>
-            <h2 className="text-base font-semibold">Inga recept sparade ännu</h2>
+            <h2 className="text-base font-semibold">Inga {activeTab === "baking" ? "bakrecept" : "recept"} sparade ännu</h2>
             <p className="mt-1 max-w-64 text-sm leading-6 text-muted-foreground">
-              Skapa ditt första recept för att komma igång.
+              Skapa ditt första {activeTab === "baking" ? "bakrecept" : "recept"} för att komma igång.
             </p>
             <Button type="button" variant="secondary" className="mt-5" onClick={() => setIsCreateOpen(true)}>
               <Plus aria-hidden="true" />
-              Nytt recept
+              Nytt {activeTab === "baking" ? "bakrecept" : "recept"}
             </Button>
           </div>
         </AppCard>
@@ -137,16 +162,16 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
           <section aria-labelledby="recipe-list-heading">
           <div className="mb-2 flex items-center justify-between">
             <h2 id="recipe-list-heading" className="text-base font-semibold text-primary">
-              Dina recept
+              {activeTab === "baking" ? "Dina bakrecept" : "Dina recept"}
             </h2>
             <Button type="button" variant="ghost" size="sm" onClick={() => setIsCreateOpen(true)} className="rounded-full text-primary">
               <Plus aria-hidden="true" />
-              Nytt recept
+              Nytt {activeTab === "baking" ? "bakrecept" : "recept"}
             </Button>
           </div>
 
           <div className="space-y-2.5">
-            {recipes.map((recipe) => {
+            {visibleRecipes.map((recipe) => {
               const availability = availabilityByRecipeId.get(recipe.id);
 
               return (
@@ -184,6 +209,11 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
                         </span>
                       </>
                     )}
+                    <span aria-hidden="true" className="text-border">•</span>
+                    <span className="flex items-center gap-1.5">
+                      <ListChecks aria-hidden="true" size={14} />
+                      {formatIngredientCount(recipe.ingredients?.length ?? 0)}
+                    </span>
                   </div>
 
                   {availability && (
@@ -213,10 +243,14 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
       )}
 
       <CreateRecipeSheet
+        key={activeCategory}
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onRecipeCreated={handleRecipeCreated}
+        category={activeCategory}
       />
+
+      <ScrollToTopButton />
     </>
   );
 }

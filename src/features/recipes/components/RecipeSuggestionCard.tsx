@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Heart, ShoppingCart, Users } from "lucide-react";
+import { Check, Clock, Heart, ListChecks, ShoppingCart, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import AppCard from "@/components/AppCard";
@@ -13,6 +13,10 @@ interface RecipeSuggestionCardProps {
 }
 
 type ShoppingFeedback = "added" | "already-exists" | null;
+
+function formatIngredientCount(count: number): string {
+  return `${count} ${count === 1 ? "ingrediens" : "ingredienser"}`;
+}
 
 export default function RecipeSuggestionCard({ suggestion }: RecipeSuggestionCardProps) {
   const { recipe, totalIngredients, availableIngredients, missingIngredients, missingProductIds, matchPercentage } = suggestion;
@@ -65,6 +69,11 @@ export default function RecipeSuggestionCard({ suggestion }: RecipeSuggestionCar
               <span className="flex items-center gap-1.5"><Clock aria-hidden="true" size={14} />{recipe.prep_time_minutes} min</span>
             </>
           )}
+          <span aria-hidden="true" className="text-border">•</span>
+          <span className="flex items-center gap-1.5">
+            <ListChecks aria-hidden="true" size={14} />
+            {formatIngredientCount(totalIngredients)}
+          </span>
         </div>
 
         <div className="mt-2.5 flex items-center justify-between gap-3 text-xs">

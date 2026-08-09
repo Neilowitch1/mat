@@ -298,7 +298,9 @@ export default function ShoppingList({
     }
   }
 
-  async function handleInventorySaved() {
+  async function markPutAwayItemAsNotCompleted(
+    failureMessage: string
+  ) {
     if (
       !putAwayItem ||
       togglingItemId ||
@@ -355,8 +357,7 @@ export default function ShoppingList({
 
       setError({
         itemId: shoppingItem.id,
-        message:
-          "Varan lades hemma, men kunde inte återställas i inköpslistan.",
+        message: failureMessage,
       });
 
       throw new Error(
@@ -367,15 +368,21 @@ export default function ShoppingList({
     }
   }
 
+  async function handleInventorySaved() {
+    await markPutAwayItemAsNotCompleted(
+      "Varan lades hemma, men kunde inte återställas i inköpslistan."
+    );
+  }
+
   async function handleShoppingItemDelete(
     shoppingItem: ShoppingItem
-  ) {
+  ): Promise<boolean> {
     if (
       togglingItemId ||
       deletingItemId ||
       isClearingList
     ) {
-      return;
+      return false;
     }
 
     const itemIndex =
@@ -401,6 +408,8 @@ export default function ShoppingList({
       await removeShoppingItem(
         shoppingItem.id
       );
+
+      return true;
     } catch {
       setShoppingItems((currentItems) => {
         if (
@@ -430,9 +439,17 @@ export default function ShoppingList({
         message:
           "Kunde inte ta bort produkten. Försök igen.",
       });
+
+      return false;
     } finally {
       setDeletingItemId(null);
     }
+  }
+
+  async function handlePutAwayItemUncomplete() {
+    await markPutAwayItemAsNotCompleted(
+      "Kunde inte avmarkera varan. Försök igen."
+    );
   }
 
   async function handleClearShoppingList() {
@@ -535,6 +552,9 @@ export default function ShoppingList({
           }}
           onInventoryItemSaved={
             handleInventorySaved
+          }
+          onMarkAsNotCompleted={
+            handlePutAwayItemUncomplete
           }
         />
       )}

@@ -84,6 +84,9 @@ interface AddInventorySheetProps {
     inventoryItem: InventoryItem
   ) => void | Promise<void>;
 
+  onMarkAsNotCompleted?: () =>
+    void | Promise<void>;
+
   mode?: "add" | "put-away";
 }
 
@@ -120,6 +123,7 @@ export default function AddInventorySheet({
   open: controlledOpen,
   onOpenChange,
   onInventoryItemSaved,
+  onMarkAsNotCompleted,
   mode = "add",
 }: AddInventorySheetProps) {
   const preselectedUnit =
@@ -188,6 +192,11 @@ export default function AddInventorySheet({
   const [
     isSubmitting,
     setIsSubmitting,
+  ] = useState(false);
+
+  const [
+    isMarkingAsNotCompleted,
+    setIsMarkingAsNotCompleted,
   ] = useState(false);
 
   const [
@@ -369,7 +378,11 @@ export default function AddInventorySheet({
 
     let isCurrentRequest = true;
 
-    setIsLoadingInventory(true);
+    queueMicrotask(() => {
+      if (isCurrentRequest) {
+        setIsLoadingInventory(true);
+      }
+    });
 
     void getInventoryItemsByProduct(
       preselectedProduct.id
@@ -579,51 +592,37 @@ export default function AddInventorySheet({
       let inventoryItem: InventoryItem;
 
       if (isPutAway) {
+        inventoryItem =
+          (
+            await refillInventoryItem({
+              ...input,
+              replaceIncompatibleUnit,
+            })
+          ).inventoryItem;
+      } else if (isMeasuredUnit) {
         /*
-         * Service-lagret avgör:
-         *
-         * g/kg/ml/cl/dl/l -> merge
-         *
-         * allt annat ->
-         * separat batch
+         * I vanligt "Lägg till hemma"-läge
+         * ska g/kg/ml/cl/dl/l också fylla på
+         * en befintlig mätbar post istället
+         * för att ge "finns redan".
          */
         inventoryItem =
           (
-            await refillInventoryItem(
-              {
-                ...input,
-                replaceIncompatibleUnit,
-              }
-            )
+            await refillInventoryItem({
+              ...input,
+              replaceIncompatibleUnit,
+            })
           ).inventoryItem;
       } else {
+        /*
+         * Burk, Flaska, Paket, st osv.
+         * fortsätter skapas som separata batcher.
+         */
         const result =
           await addInventoryItem({
             ...input,
             status,
           });
-
-        /*
-         * Detta kan numera endast
-         * uppstå för exakta mängder
-         * som redan finns.
-         *
-         * Batch-enheter skapas
-         * separat.
-         */
-        if (
-          result.alreadyExists
-        ) {
-          setErrorMessage(
-            `${product.name} finns redan i ${inventoryLocationLabels[
-              location
-            ].toLocaleLowerCase(
-              "sv"
-            )}.`
-          );
-
-          return;
-        }
 
         inventoryItem =
           result.inventoryItem;
@@ -648,6 +647,24 @@ export default function AddInventorySheet({
       );
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleMarkAsNotCompleted() {
+    if (!onMarkAsNotCompleted) return;
+
+    setIsMarkingAsNotCompleted(true);
+    setErrorMessage(null);
+
+    try {
+      await onMarkAsNotCompleted();
+      setIsOpen(false);
+      onOpenChange?.(false);
+      resetForm();
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setIsMarkingAsNotCompleted(false);
     }
   }
 
@@ -1030,8 +1047,8 @@ export default function AddInventorySheet({
                   <p className="mt-1 text-sm leading-5 text-muted-foreground">
                     Den nya varan
                     sparas separat
-                    från det du redan
-                    har hemma.
+                    i den existerande varan som redan
+                    finns hemma.
                   </p>
 
                   {existingItemsAtLocation.length >
@@ -1324,21 +1341,56 @@ export default function AddInventorySheet({
             </p>
           )}
 
-          <Button
-            type="submit"
-            disabled={
-              isSubmitting ||
-              isLoadingInventory ||
-              hasUnresolvedUnitConflict
-            }
-            className="mt-5 h-12 w-full rounded-2xl text-base"
-          >
-            {isSubmitting
-              ? "Sparar..."
-              : isPutAway
-                ? "Spara hemma"
-                : "Lägg till hemma"}
-          </Button>
+          <div className="mt-5 grid gap-2">
+            <Button
+              type="submit"
+              disabled={
+                isSubmitting ||
+                isMarkingAsNotCompleted ||
+                isLoadingInventory ||
+                hasUnresolvedUnitConflict
+              }
+              className="h-12 w-full rounded-2xl text-base"
+            >
+              {isSubmitting
+                ? "Sparar..."
+                : "Lägg till i hemmet"}
+            </Button>
+
+            {isPutAway && onMarkAsNotCompleted && (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={
+                  isSubmitting ||
+                  isMarkingAsNotCompleted
+                }
+                onClick={() =>
+                  void handleMarkAsNotCompleted()
+                }
+                className="h-11 w-full rounded-2xl"
+              >
+                {isMarkingAsNotCompleted
+                  ? "Avmarkerar..."
+                  : "Avmarkera"}
+              </Button>
+            )}
+
+            {isPutAway && (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={
+                  isSubmitting ||
+                  isMarkingAsNotCompleted
+                }
+                onClick={() => onOpenChange?.(false)}
+                className="h-11 w-full rounded-2xl text-muted-foreground"
+              >
+                Avbryt
+              </Button>
+            )}
+          </div>
         </form>
       </SheetContent>
     </Sheet>

@@ -25,6 +25,7 @@ interface ProductSearchFieldProps {
   disabled?: boolean;
   placeholder?: string;
   duplicateMessage?: string;
+  autoFocus?: boolean;
   onDuplicate?: (product: Product) => void;
   onQueryChange?: (query: string) => void;
   onChange: (product: Product | null) => void;
@@ -52,6 +53,7 @@ const ProductSearchField = forwardRef<
     disabled,
     placeholder = "Lägg till produkt",
     duplicateMessage = "Produkten är redan vald.",
+    autoFocus = false,
     onDuplicate,
     onQueryChange,
     onChange,
@@ -129,6 +131,20 @@ const ProductSearchField = forwardRef<
     }),
     [closeDropdown]
   );
+
+  useEffect(() => {
+    if (!autoFocus || disabled) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [autoFocus, disabled]);
 
   useEffect(() => {
     if (!canSearch) return;
@@ -234,6 +250,7 @@ const ProductSearchField = forwardRef<
         disabled={disabled}
         placeholder={placeholder}
         autoComplete="off"
+        autoFocus={autoFocus}
         className="h-11 pl-9 text-base md:text-sm"
         role="combobox"
         aria-expanded={canSearch}

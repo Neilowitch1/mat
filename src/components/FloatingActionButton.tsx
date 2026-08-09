@@ -56,9 +56,15 @@ interface ActionProps {
   subtitle: string;
 }
 
-function Action({ href, icon: Icon, title, subtitle }: ActionProps) {
+function Action({
+  href,
+  icon: Icon,
+  title,
+  subtitle,
+}: ActionProps) {
   return (
     <SheetClose
+      nativeButton={false}
       render={
         <Link
           href={href}
@@ -69,11 +75,21 @@ function Action({ href, icon: Icon, title, subtitle }: ActionProps) {
       <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#dde8df] text-[#425b48]">
         <Icon size={20} />
       </span>
+
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold">{title}</span>
-        <span className="mt-0.5 block text-sm text-muted-foreground">{subtitle}</span>
+        <span className="block font-semibold">
+          {title}
+        </span>
+
+        <span className="mt-0.5 block text-sm text-muted-foreground">
+          {subtitle}
+        </span>
       </span>
-      <ChevronRight className="text-muted-foreground" size={18} />
+
+      <ChevronRight
+        className="text-muted-foreground"
+        size={18}
+      />
     </SheetClose>
   );
 }

@@ -1,22 +1,31 @@
-import { Archive, Refrigerator, Snowflake, type LucideIcon } from "lucide-react";
+import {
+  Archive,
+  CookingPot,
+  Refrigerator,
+  Snowflake,
+  type LucideIcon,
+} from "lucide-react";
 import type { InventoryLocation, InventoryStatus } from "@/types/database";
 
 export const inventoryLocations: Array<{ label: string; value: InventoryLocation }> = [
   { label: "Kyl", value: "fridge" },
   { label: "Frys", value: "freezer" },
   { label: "Skafferi", value: "pantry" },
+  { label: "Kryddor", value: "spices" },
 ];
 
 export const inventoryLocationLabels: Record<InventoryLocation, string> = {
   fridge: "Kyl",
   freezer: "Frys",
   pantry: "Skafferi",
+  spices: "Kryddor",
 };
 
 export const inventoryLocationIcons: Record<InventoryLocation, LucideIcon> = {
   fridge: Refrigerator,
   freezer: Snowflake,
   pantry: Archive,
+  spices: CookingPot,
 };
 
 export const inventoryStatuses: Array<{ label: string; value: InventoryStatus }> = [

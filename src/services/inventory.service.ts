@@ -190,6 +190,29 @@ export async function removeInventoryItem(
   if (error) throw error;
 }
 
+async function removeEmptyInventoryItemsForProductAndLocation(
+  productId: string,
+  location: InventoryLocation,
+  excludeId?: string
+): Promise<void> {
+  let query = supabase
+    .from("inventory")
+    .delete()
+    .eq("product_id", productId)
+    .eq("location", location)
+    .eq("status", "empty");
+
+  if (excludeId) {
+    query = query.neq("id", excludeId);
+  }
+
+  const { error } = await query;
+
+  if (error) {
+    throw error;
+  }
+}
+
 /*
  * Hittar den inventory-post som ett exakt
  * mått ska fyllas på i.
@@ -391,15 +414,54 @@ export async function addInventoryItem({
    *
    * ger två inventory-rader.
    */
-  const inventoryItem =
-    await insertInventoryItem({
+const inventoryItem =
+  await insertInventoryItem({
+    productId,
+    quantity,
+    unit: normalizedUnit,
+    status,
+    location,
+    expiresAt,
+  });
+
+/*
+ * När en ny full batch läggs hemma
+ * behövs gamla "Slut"-batcher av samma
+ * produkt på samma plats inte längre.
+ *
+ * Detta gäller endast batch-/förpackningsenheter.
+ * g/kg/ml/cl/dl/l fortsätter använda merge-logiken.
+ */
+if (
+  status === "full" &&
+  !isMergeableInventoryUnit(normalizedUnit)
+) {
+  try {
+    await removeEmptyInventoryItemsForProductAndLocation(
       productId,
-      quantity,
-      unit: normalizedUnit,
-      status,
       location,
-      expiresAt,
-    });
+      inventoryItem.id
+    );
+  } catch (cleanupError) {
+    /*
+     * Om cleanup misslyckas rullar vi tillbaka
+     * den nya posten så användaren inte hamnar
+     * i ett halvt genomfört läge.
+     */
+    const { error: rollbackError } = await supabase
+      .from("inventory")
+      .delete()
+      .eq("id", inventoryItem.id);
+
+    if (rollbackError) {
+      throw new Error(
+        "Den nya varan lades till, men den gamla slut-markerade varan kunde inte tas bort."
+      );
+    }
+
+    throw cleanupError;
+  }
+}
 
   return {
     inventoryItem,
@@ -493,26 +555,57 @@ export async function refillInventoryItem({
    * Rulle
    * custom units
    */
-  if (
-    !isMergeableInventoryUnit(
-      normalizedUnit
-    )
-  ) {
-    const inventoryItem =
-      await insertInventoryItem({
-        productId,
-        quantity,
-        unit: normalizedUnit,
-        status: "full",
-        location,
-        expiresAt,
-      });
+if (
+  !isMergeableInventoryUnit(
+    normalizedUnit
+  )
+) {
+  const inventoryItem =
+    await insertInventoryItem({
+      productId,
+      quantity,
+      unit: normalizedUnit,
+      status: "full",
+      location,
+      expiresAt,
+    });
 
-    return {
-      inventoryItem,
-      created: true,
-    };
+  try {
+    /*
+     * Den nya batchen är full.
+     * Gamla batcher av samma produkt på
+     * samma plats som är markerade "Slut"
+     * tas därför bort automatiskt.
+     */
+    await removeEmptyInventoryItemsForProductAndLocation(
+      productId,
+      location,
+      inventoryItem.id
+    );
+  } catch (cleanupError) {
+    /*
+     * Om cleanup misslyckas tar vi bort den
+     * nyss skapade posten igen.
+     */
+    const { error: rollbackError } = await supabase
+      .from("inventory")
+      .delete()
+      .eq("id", inventoryItem.id);
+
+    if (rollbackError) {
+      throw new Error(
+        "Den nya varan lades till, men den gamla slut-markerade varan kunde inte tas bort."
+      );
+    }
+
+    throw cleanupError;
   }
+
+  return {
+    inventoryItem,
+    created: true,
+  };
+}
 
   /*
    * =================================================

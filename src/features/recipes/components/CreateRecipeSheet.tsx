@@ -6,16 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { createRecipeWithIngredients } from "@/services/recipes.service";
-import type { Recipe } from "@/types/database";
+import type { Recipe, RecipeCategory } from "@/types/database";
 import IngredientDraftRow, { type IngredientDraft } from "./IngredientDraftRow";
 
 interface CreateRecipeSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRecipeCreated: (recipe: Recipe) => void;
+  category: RecipeCategory;
 }
 
-export default function CreateRecipeSheet({ open, onOpenChange, onRecipeCreated }: CreateRecipeSheetProps) {
+export default function CreateRecipeSheet({ open, onOpenChange, onRecipeCreated, category }: CreateRecipeSheetProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [servings, setServings] = useState("4");
@@ -54,8 +55,8 @@ export default function CreateRecipeSheet({ open, onOpenChange, onRecipeCreated 
       setErrorMessage("Förberedelsetiden kan inte vara negativ.");
       return;
     }
-    if (ingredients.some((ingredient) => ingredient.amount && (!Number.isFinite(Number(ingredient.amount)) || Number(ingredient.amount) < 0))) {
-      setErrorMessage("Ingrediensmängder kan inte vara negativa.");
+    if (ingredients.some((ingredient) => ingredient.amount.trim() && !/^[0-9.,/\-\s]+$/.test(ingredient.amount))) {
+      setErrorMessage("Ingrediensmängder får bara innehålla siffror, decimaltecken, / och -.");
       return;
     }
 
@@ -80,10 +81,11 @@ export default function CreateRecipeSheet({ open, onOpenChange, onRecipeCreated 
           servings: parsedServings,
           prep_time_minutes: parsedPrepTime,
           favorite,
+          category,
         },
         ingredients.map((ingredient) => ({
           productId: ingredient.product!.id,
-          amount: ingredient.amount ? Number(ingredient.amount) : null,
+          amount: ingredient.amount.trim() || null,
           unit: ingredient.unit.trim() || null,
         }))
       );
@@ -101,8 +103,8 @@ export default function CreateRecipeSheet({ open, onOpenChange, onRecipeCreated 
     <Sheet open={open} onOpenChange={(nextOpen) => { onOpenChange(nextOpen); if (!nextOpen && !isSubmitting) resetForm(); }}>
       <SheetContent side="bottom" className="mx-auto max-h-[94dvh] max-w-md">
         <SheetHeader className="px-5 pt-4">
-          <SheetTitle className="text-xl">Nytt recept</SheetTitle>
-          <SheetDescription>Spara receptet och dess ingredienser.</SheetDescription>
+          <SheetTitle className="text-xl">{category === "baking" ? "Nytt bakrecept" : "Nytt recept"}</SheetTitle>
+          <SheetDescription>Spara {category === "baking" ? "bakreceptet" : "receptet"} och dess ingredienser.</SheetDescription>
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto px-5 pb-7">

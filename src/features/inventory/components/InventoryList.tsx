@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageOpen } from "lucide-react";
+import { Check, ChevronDown, PackageOpen } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
@@ -34,6 +42,7 @@ import {
   inventoryLocationIcons,
   inventoryLocationLabels,
   inventoryLocations,
+  inventoryStatuses,
 } from "./inventoryFormOptions";
 
 interface InventoryListProps {
@@ -53,6 +62,27 @@ type InventoryDisplayGroup = {
   className: string;
   productGroups: ProductInventoryGroup[];
 };
+
+type InventorySort =
+  | "default"
+  | "name"
+  | "updated"
+  | "expiration";
+
+type InventoryExpirationFilter = "expired" | "soon";
+
+const RESORT_DELAY_MS = 1500;
+const UPDATE_FEEDBACK_DURATION_MS = 2200;
+
+function getInventorySortSignature(item: InventoryItem): string {
+  return [
+    item.product_id,
+    item.product?.name ?? "",
+    item.location,
+    item.status,
+    item.expires_at ?? "",
+  ].join("|");
+}
 
 const urgentExpirationGroups: Array<{
   value: InventoryExpirationGroup;
@@ -129,6 +159,16 @@ const statusPriority: Record<InventoryStatus, number> = {
   three_quarters: 3,
   full: 4,
 };
+
+const inventorySortOptions: Array<{
+  value: InventorySort;
+  label: string;
+}> = [
+  { value: "default", label: "Status (standard)" },
+  { value: "name", label: "Namn A–Ö" },
+  { value: "updated", label: "Senast ändrad" },
+  { value: "expiration", label: "Bäst före" },
+];
 
 function compareInventoryItems(
   firstItem: InventoryItem,
@@ -302,6 +342,39 @@ function compareProductGroups(
   });
 }
 
+function getLatestUpdatedAt(group: ProductInventoryGroup): string {
+  return group.items.reduce(
+    (latest, item) =>
+      item.updated_at > latest ? item.updated_at : latest,
+    ""
+  );
+}
+
+function compareProductGroupsBySort(
+  firstGroup: ProductInventoryGroup,
+  secondGroup: ProductInventoryGroup,
+  sort: InventorySort
+): number {
+  if (sort === "updated") {
+    const updatedComparison = getLatestUpdatedAt(secondGroup).localeCompare(
+      getLatestUpdatedAt(firstGroup)
+    );
+
+    if (updatedComparison !== 0) return updatedComparison;
+  }
+
+  if (sort === "expiration") {
+    return compareProductGroups(firstGroup, secondGroup);
+  }
+
+  const firstName = firstGroup.items[0]?.product?.name ?? "";
+  const secondName = secondGroup.items[0]?.product?.name ?? "";
+
+  return firstName.localeCompare(secondName, "sv", {
+    sensitivity: "base",
+  });
+}
+
 function getPluralUnitLabel(
   unit: string,
   quantity: number
@@ -376,11 +449,27 @@ export default function InventoryList({
     InventoryLocation | "all"
   >("all");
 
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+
+  const [statusFilter, setStatusFilter] = useState<
+    InventoryStatus | "all"
+  >("all");
+
+  const [inventorySort, setInventorySort] =
+    useState<InventorySort>("default");
+
+  const [expirationFilters, setExpirationFilters] = useState<
+    InventoryExpirationFilter[]
+  >([]);
+
   const [isSearchOpen, setIsSearchOpen] =
     useState(false);
 
   const [deletingItemId, setDeletingItemId] =
     useState<string | null>(null);
+
+  const [itemPendingDelete, setItemPendingDelete] =
+    useState<InventoryItem | null>(null);
 
   const [deleteError, setDeleteError] = useState<{
     itemId: string;
@@ -389,6 +478,22 @@ export default function InventoryList({
 
   const [expandedBatchId, setExpandedBatchId] =
     useState<string | null>(null);
+
+  const [sortingOverrides, setSortingOverrides] = useState<
+    Map<string, InventoryItem>
+  >(() => new Map());
+
+  const [updateFeedback, setUpdateFeedback] = useState<
+    Map<string, string>
+  >(() => new Map());
+
+  const resortTimers = useRef(
+    new Map<string, ReturnType<typeof setTimeout>>()
+  );
+
+  const feedbackTimers = useRef(
+    new Map<string, ReturnType<typeof setTimeout>>()
+  );
 
   const realtimeVersions = useRef(
     new Map<string, number>()
@@ -411,6 +516,16 @@ export default function InventoryList({
     });
   }, [router, searchParams]);
 
+  useEffect(() => {
+    const activeResortTimers = resortTimers.current;
+    const activeFeedbackTimers = feedbackTimers.current;
+
+    return () => {
+      activeResortTimers.forEach(clearTimeout);
+      activeFeedbackTimers.forEach(clearTimeout);
+    };
+  }, []);
+
   function focusInventoryItem(id: string) {
     const inventoryItem = inventoryItems.find(
       (item) => item.id === id
@@ -423,6 +538,9 @@ export default function InventoryList({
     ) {
       setLocationFilter(inventoryItem.location);
     }
+
+    setStatusFilter("all");
+    setExpirationFilters([]);
 
     requestAnimationFrame(() => {
       const row = document.getElementById(
@@ -502,6 +620,75 @@ export default function InventoryList({
   function handleInventoryItemChange(
     updatedItem: InventoryItem
   ) {
+    const previousItem = inventoryItems.find(
+      (item) => item.id === updatedItem.id
+    );
+
+    if (
+      previousItem &&
+      getInventorySortSignature(previousItem) !==
+        getInventorySortSignature(updatedItem)
+    ) {
+      setSortingOverrides((currentOverrides) => {
+        const nextOverrides = new Map(currentOverrides);
+
+        if (!nextOverrides.has(updatedItem.id)) {
+          nextOverrides.set(updatedItem.id, previousItem);
+        }
+
+        return nextOverrides;
+      });
+
+      const existingResortTimer = resortTimers.current.get(
+        updatedItem.id
+      );
+
+      if (existingResortTimer) {
+        clearTimeout(existingResortTimer);
+      }
+
+      resortTimers.current.set(
+        updatedItem.id,
+        setTimeout(() => {
+          setSortingOverrides((currentOverrides) => {
+            const nextOverrides = new Map(currentOverrides);
+            nextOverrides.delete(updatedItem.id);
+            return nextOverrides;
+          });
+          resortTimers.current.delete(updatedItem.id);
+        }, RESORT_DELAY_MS)
+      );
+
+      setUpdateFeedback((currentFeedback) => {
+        const nextFeedback = new Map(currentFeedback);
+        nextFeedback.set(
+          updatedItem.id,
+          `${updatedItem.product?.name ?? "Produkten"} uppdaterad`
+        );
+        return nextFeedback;
+      });
+
+      const existingFeedbackTimer = feedbackTimers.current.get(
+        updatedItem.id
+      );
+
+      if (existingFeedbackTimer) {
+        clearTimeout(existingFeedbackTimer);
+      }
+
+      feedbackTimers.current.set(
+        updatedItem.id,
+        setTimeout(() => {
+          setUpdateFeedback((currentFeedback) => {
+            const nextFeedback = new Map(currentFeedback);
+            nextFeedback.delete(updatedItem.id);
+            return nextFeedback;
+          });
+          feedbackTimers.current.delete(updatedItem.id);
+        }, UPDATE_FEEDBACK_DURATION_MS)
+      );
+    }
+
     setInventoryItems((currentItems) =>
       currentItems.map((item) =>
         item.id === updatedItem.id ? updatedItem : item
@@ -527,6 +714,13 @@ export default function InventoryList({
     });
   }
 
+  function handleDeleteRequest(
+    inventoryItem: InventoryItem
+  ) {
+    setDeleteError(null);
+    setItemPendingDelete(inventoryItem);
+  }
+
   async function handleInventoryItemDelete(
     inventoryItem: InventoryItem
   ) {
@@ -549,6 +743,7 @@ export default function InventoryList({
 
     try {
       await removeInventoryItem(inventoryItem.id);
+      setItemPendingDelete(null);
     } catch {
       setInventoryItems((currentItems) => {
         if (
@@ -581,17 +776,78 @@ export default function InventoryList({
   }
 
   const filteredProductGroups = useMemo(() => {
+    const itemsForSorting = inventoryItems.map(
+      (item) => sortingOverrides.get(item.id) ?? item
+    );
+
     const filteredItems =
       locationFilter === "all"
-        ? inventoryItems
-        : inventoryItems.filter(
+        ? itemsForSorting
+        : itemsForSorting.filter(
             (item) => item.location === locationFilter
           );
 
-    return groupItemsByProductAndLocation(filteredItems);
-  }, [inventoryItems, locationFilter]);
+    return groupItemsByProductAndLocation(filteredItems).filter((group) => {
+      if (
+        statusFilter !== "all" &&
+        getProductGroupStatus(group) !== statusFilter
+      ) {
+        return false;
+      }
+
+      if (expirationFilters.length === 0) return true;
+
+      const expiration = getProductGroupExpiration(group);
+
+      return expirationFilters.some((filter) =>
+        filter === "expired"
+          ? expiration === "expired"
+          : expiration === "today" || expiration === "soon"
+      );
+    });
+  }, [
+    expirationFilters,
+    inventoryItems,
+    locationFilter,
+    sortingOverrides,
+    statusFilter,
+  ]);
 
   const groupedInventoryItems = useMemo(() => {
+    if (inventorySort !== "default") {
+      const labels: Record<Exclude<InventorySort, "default">, string> = {
+        name: "Namn A–Ö",
+        updated: "Senast ändrad",
+        expiration: "Bäst före",
+      };
+
+      const currentItemsById = new Map(
+        inventoryItems.map((item) => [item.id, item])
+      );
+
+      return [
+        {
+          value: `sort-${inventorySort}`,
+          label: labels[inventorySort],
+          className: "text-muted-foreground",
+          productGroups: [...filteredProductGroups]
+            .sort((firstGroup, secondGroup) =>
+              compareProductGroupsBySort(
+                firstGroup,
+                secondGroup,
+                inventorySort
+              )
+            )
+            .map((productGroup) => ({
+              ...productGroup,
+              items: productGroup.items.map(
+                (item) => currentItemsById.get(item.id) ?? item
+              ),
+            })),
+        },
+      ];
+    }
+
     const handledGroupKeys = new Set<string>();
 
     const groups: InventoryDisplayGroup[] = [];
@@ -661,8 +917,33 @@ export default function InventoryList({
       });
     }
 
-    return groups;
-  }, [filteredProductGroups]);
+    const currentItemsById = new Map(
+      inventoryItems.map((item) => [item.id, item])
+    );
+
+    return groups.map((group) => ({
+      ...group,
+      productGroups: group.productGroups.map((productGroup) => ({
+        ...productGroup,
+        items: productGroup.items.map(
+          (item) => currentItemsById.get(item.id) ?? item
+        ),
+      })),
+    }));
+  }, [filteredProductGroups, inventoryItems, inventorySort]);
+
+  const activeAdvancedFilterCount =
+    (statusFilter === "all" ? 0 : 1) +
+    (inventorySort === "default" ? 0 : 1) +
+    expirationFilters.length;
+
+  function toggleExpirationFilter(filter: InventoryExpirationFilter) {
+    setExpirationFilters((currentFilters) =>
+      currentFilters.includes(filter)
+        ? currentFilters.filter((currentFilter) => currentFilter !== filter)
+        : [...currentFilters, filter]
+    );
+  }
 
   const visibleProductCount =
     groupedInventoryItems.reduce(
@@ -745,7 +1026,8 @@ export default function InventoryList({
               Filtrera produkter efter plats
             </legend>
 
-            <div className="grid grid-cols-4 gap-0.5 rounded-[18px] bg-secondary p-0.5">
+            <div className="rounded-[18px] bg-secondary p-0.5">
+              <div className="grid grid-cols-[repeat(5,minmax(0,1fr))_2.25rem] gap-0.5">
               <Button
                 type="button"
                 variant="ghost"
@@ -754,7 +1036,7 @@ export default function InventoryList({
                 onClick={() =>
                   setLocationFilter("all")
                 }
-                className={`h-9 rounded-[14px] px-2 text-xs ${
+                className={`h-9 rounded-[14px] px-1 text-[0.8rem] ${
                   locationFilter === "all"
                     ? "bg-card text-primary shadow-sm hover:bg-card"
                     : "text-muted-foreground hover:bg-card/70"
@@ -764,11 +1046,6 @@ export default function InventoryList({
               </Button>
 
               {inventoryLocations.map((location) => {
-                const LocationIcon =
-                  inventoryLocationIcons[
-                    location.value
-                  ];
-
                 return (
                   <Button
                     key={location.value}
@@ -781,17 +1058,12 @@ export default function InventoryList({
                     onClick={() =>
                       setLocationFilter(location.value)
                     }
-                    className={`h-9 gap-1 rounded-[14px] px-1.5 text-xs ${
+                    className={`h-9 rounded-[14px] px-1 text-[0.8rem] ${
                       locationFilter === location.value
                         ? "bg-card text-primary shadow-sm hover:bg-card"
                         : "text-muted-foreground hover:bg-card/70"
                     }`}
                   >
-                    <LocationIcon
-                      aria-hidden="true"
-                      className="size-3.5"
-                    />
-
                     {
                       inventoryLocationLabels[
                         location.value
@@ -800,6 +1072,133 @@ export default function InventoryList({
                   </Button>
                 );
               })}
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-expanded={isFiltersOpen}
+                aria-controls="inventory-advanced-filters"
+                aria-label={isFiltersOpen ? "Stäng fler filter" : "Visa fler filter"}
+                onClick={() => setIsFiltersOpen((isOpen) => !isOpen)}
+                className="relative h-9 w-9 rounded-[14px] text-muted-foreground hover:bg-card/70"
+              >
+                <ChevronDown
+                  aria-hidden="true"
+                  className={`size-4 transition-transform duration-200 ${
+                    isFiltersOpen ? "rotate-180" : ""
+                  }`}
+                />
+                {activeAdvancedFilterCount > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary"
+                  />
+                )}
+              </Button>
+              </div>
+
+              <div
+                id="inventory-advanced-filters"
+                aria-hidden={!isFiltersOpen}
+                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                  isFiltersOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "pointer-events-none grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="mx-2 mb-2 mt-1 space-y-4 border-t border-border/60 px-1 pt-3">
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-foreground">Status</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[{ label: "Alla", value: "all" as const }, ...inventoryStatuses].map((status) => (
+                          <Button
+                            key={status.value}
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-pressed={statusFilter === status.value}
+                            onClick={() => setStatusFilter(status.value)}
+                            className={`h-8 rounded-xl px-2 text-xs ${
+                              statusFilter === status.value
+                                ? "bg-card text-primary shadow-sm hover:bg-card"
+                                : "text-muted-foreground hover:bg-card/70"
+                            }`}
+                          >
+                            {status.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-foreground">Sortera efter</p>
+                      <div className="grid gap-1 sm:grid-cols-2" role="radiogroup">
+                        {inventorySortOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={inventorySort === option.value}
+                            onClick={() => setInventorySort(option.value)}
+                            className="flex min-h-9 items-center gap-2 rounded-xl px-2.5 text-left text-sm text-foreground transition-colors hover:bg-card/70"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                                inventorySort === option.value
+                                  ? "border-primary"
+                                  : "border-muted-foreground/40"
+                              }`}
+                            >
+                              {inventorySort === option.value && (
+                                <span className="size-2 rounded-full bg-primary" />
+                              )}
+                            </span>
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-foreground">Visa endast</p>
+                      <div className="grid gap-1 sm:grid-cols-2">
+                        {([
+                          { value: "expired", label: "Utgångna" },
+                          { value: "soon", label: "Går ut snart (0–3 dagar)" },
+                        ] as const).map((option) => {
+                          const isActive = expirationFilters.includes(option.value);
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={isActive}
+                              onClick={() => toggleExpirationFilter(option.value)}
+                              className="flex min-h-9 items-center gap-2 rounded-xl px-2.5 text-left text-sm text-foreground transition-colors hover:bg-card/70"
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`flex size-4 shrink-0 items-center justify-center rounded border ${
+                                  isActive
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-muted-foreground/40"
+                                }`}
+                              >
+                                {isActive && <Check className="size-3" />}
+                              </span>
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </fieldset>
 
@@ -843,11 +1242,14 @@ export default function InventoryList({
                             >
                               <InventoryItemRow
                                 item={firstItem}
+                                updateFeedbackMessage={
+                                  updateFeedback.get(firstItem.id)
+                                }
                                 onItemChange={
                                   handleInventoryItemChange
                                 }
                                 onDelete={
-                                  handleInventoryItemDelete
+                                  handleDeleteRequest
                                 }
                                 deleteDisabled={Boolean(
                                   deletingItemId
@@ -905,7 +1307,7 @@ export default function InventoryList({
 
                             <div className="space-y-2">
                               {productGroup.items.map(
-                                (item, index) => (
+                                (item) => (
                                   <div
                                     key={item.id}
                                     id={`inventory-item-${item.id}`}
@@ -920,10 +1322,12 @@ export default function InventoryList({
                                           current === item.id ? null : item.id
                                         )
                                       }
-                                      batchNumber={index + 1}
                                       item={item}
+                                      updateFeedbackMessage={
+                                        updateFeedback.get(item.id)
+                                      }
                                       onItemChange={handleInventoryItemChange}
-                                      onDelete={handleInventoryItemDelete}
+                                      onDelete={handleDeleteRequest}
                                       deleteDisabled={Boolean(deletingItemId)}
                                       deleteErrorMessage={
                                         deleteError?.itemId === item.id
@@ -948,6 +1352,68 @@ export default function InventoryList({
       )}
 
       <ScrollToTopButton />
+
+      <Sheet
+        open={Boolean(itemPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deletingItemId) {
+            setItemPendingDelete(null);
+          }
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          showCloseButton={!deletingItemId}
+          className="mx-auto max-w-md px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+        >
+          <SheetHeader className="px-0 pb-1 pt-4">
+            <SheetTitle className="text-lg text-primary">
+              Ta bort vara?
+            </SheetTitle>
+
+            <SheetDescription>
+              Är du säker på att du vill ta bort{" "}
+              <span className="font-medium text-foreground">
+                {itemPendingDelete?.product?.name ?? "varan"}
+              </span>{" "}
+              från Hemma?
+            </SheetDescription>
+          </SheetHeader>
+
+          {itemPendingDelete &&
+            deleteError?.itemId === itemPendingDelete.id && (
+              <p role="alert" className="text-sm text-destructive">
+                {deleteError.message}
+              </p>
+            )}
+
+          <SheetFooter className="grid grid-cols-2 gap-3 px-0 pb-0 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              disabled={Boolean(deletingItemId)}
+              onClick={() => setItemPendingDelete(null)}
+            >
+              Avbryt
+            </Button>
+
+            <Button
+              type="button"
+              variant="destructive"
+              size="lg"
+              disabled={!itemPendingDelete || Boolean(deletingItemId)}
+              onClick={() => {
+                if (itemPendingDelete) {
+                  void handleInventoryItemDelete(itemPendingDelete);
+                }
+              }}
+            >
+              {deletingItemId ? "Tar bort..." : "Ta bort"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <AddInventorySheet
         onInventoryItemAdded={handleInventoryItemAdded}
