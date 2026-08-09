@@ -110,7 +110,7 @@ export default function CreateRecipeSheet({ open, onOpenChange, onRecipeCreated,
         <form onSubmit={handleSubmit} className="overflow-y-auto px-5 pb-7">
           <div className="space-y-4">
             <Field label="Namn" htmlFor="recipe-name">
-              <Input id="recipe-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Till exempel kycklingpasta" autoFocus />
+              <Input id="recipe-name" value={name} onChange={(event) => setName(event.target.value)} placeholder={category === "baking" ? "Till exempel kladdkaka" : "Till exempel kycklingpasta"} autoFocus />
             </Field>
             <Field label="Beskrivning" htmlFor="recipe-description">
               <textarea id="recipe-description" value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="En kort beskrivning" className="w-full resize-none rounded-[18px] border border-input bg-card px-4 py-3 text-base outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20" />
