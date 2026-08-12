@@ -1,6 +1,7 @@
-import { Search, Settings, type LucideIcon } from "lucide-react";
+import { Settings, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
+import SearchSheetLink from "@/components/SearchSheetLink";
 import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
@@ -46,9 +47,7 @@ export default function AppHeader({
 
         <div className="flex shrink-0 items-center gap-2">
           {searchHref && (
-            <Link href={searchHref} aria-label="Sök" className={actionClassName}>
-              <Search aria-hidden="true" size={19} />
-            </Link>
+            <SearchSheetLink href={searchHref} className={actionClassName} />
           )}
           {showSettings && (
             <Link

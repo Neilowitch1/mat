@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
+import { openSearchSheetEvent } from "@/components/SearchSheetLink";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import { Button } from "@/components/ui/button";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
@@ -52,6 +53,15 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
       return;
     }
   });
+
+  useEffect(() => {
+    const openSearch = (event: Event) => {
+      event.preventDefault();
+      setIsSearchOpen(true);
+    };
+    window.addEventListener(openSearchSheetEvent, openSearch);
+    return () => window.removeEventListener(openSearchSheetEvent, openSearch);
+  }, []);
 
   useEffect(() => {
     if (searchParams.get("add") !== "1") return;

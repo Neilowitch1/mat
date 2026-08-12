@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
+import { openSearchSheetEvent } from "@/components/SearchSheetLink";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -501,6 +502,15 @@ export default function InventoryList({
 
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const openSearch = (event: Event) => {
+      event.preventDefault();
+      setIsSearchOpen(true);
+    };
+    window.addEventListener(openSearchSheetEvent, openSearch);
+    return () => window.removeEventListener(openSearchSheetEvent, openSearch);
+  }, []);
 
   useEffect(() => {
     if (searchParams.get("search") !== "1") {
