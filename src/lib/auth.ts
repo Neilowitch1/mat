@@ -1,27 +1,29 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-export async function getAuthState() {
+export const getAuthState = cache(async () => {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims;
 
-  if (!user) return { user: null, activeHouseholdId: null };
+  if (!claims?.sub) return { userId: null, activeHouseholdId: null };
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("active_household_id")
-    .eq("id", user.id)
+    .eq("id", claims.sub)
     .maybeSingle();
 
   return {
-    user,
+    userId: claims.sub,
     activeHouseholdId: profile?.active_household_id ?? null,
   };
-}
+});
 
 export async function requireOnboardedUser() {
   const state = await getAuthState();
-  if (!state.user) redirect("/logga-in");
+  if (!state.userId) redirect("/logga-in");
   if (!state.activeHouseholdId) redirect("/onboarding");
   return state;
 }

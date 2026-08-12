@@ -6,6 +6,7 @@ import { getExternalRecipeOnServer } from "@/services/externalRecipes/externalRe
 import { getInventory } from "@/services/inventory.service";
 import { getProducts } from "@/services/products.service";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { requireOnboardedUser } from "@/lib/auth";
 
 interface ExternalRecipePageProps {
   params: Promise<{ id: string }>;
@@ -13,11 +14,12 @@ interface ExternalRecipePageProps {
 
 export default async function ExternalRecipePage({ params }: ExternalRecipePageProps) {
   const { id } = await params;
+  const { activeHouseholdId } = await requireOnboardedUser();
   const supabase = await createSupabaseServerClient();
   const [recipe, inventoryItems, products] = await Promise.all([
     getExternalRecipeOnServer(id),
-    getInventory(supabase),
-    getProducts(),
+    getInventory(supabase, activeHouseholdId),
+    getProducts(supabase),
   ]);
 
   if (!recipe) notFound();

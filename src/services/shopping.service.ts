@@ -2,8 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { getActiveHouseholdId } from "@/lib/householdContext";
 import type { ShoppingItem } from "@/types/database";
 
-export async function getShoppingList(client = supabase): Promise<ShoppingItem[]> {
-  const householdId = await getActiveHouseholdId(client);
+export async function getShoppingList(client = supabase, activeHouseholdId?: string): Promise<ShoppingItem[]> {
+  const householdId = activeHouseholdId ?? await getActiveHouseholdId(client);
   const { data, error } = await client
     .from("shopping_list")
     .select(`

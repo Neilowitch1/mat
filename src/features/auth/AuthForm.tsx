@@ -15,17 +15,15 @@ export default function AuthForm({ mode, nextPath }: { mode: Mode; nextPath?: st
     try {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error;
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: profile } = await supabase.from("profiles").select("active_household_id").eq("id", user!.id).maybeSingle();
-        router.replace(nextPath ?? (profile?.active_household_id ? "/hemma" : "/onboarding")); router.refresh();
+        router.replace(nextPath ?? "/hemma");
       } else if (mode === "signup") {
         const destination = nextPath ?? "/onboarding";
         const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(destination)}` } }); if (error) throw error;
-        if (data.session) { router.replace(destination); router.refresh(); } else setSent(true);
+        if (data.session) { router.replace(destination); } else setSent(true);
       } else if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/callback?next=/aterstall-losenord` }); if (error) throw error; setSent(true);
       } else {
-        const { error } = await supabase.auth.updateUser({ password }); if (error) throw error; toast.success("Lösenordet är uppdaterat"); router.replace("/hemma"); router.refresh();
+        const { error } = await supabase.auth.updateUser({ password }); if (error) throw error; toast.success("Lösenordet är uppdaterat"); router.replace("/hemma");
       }
     } catch (error) { toast.error(error instanceof Error ? error.message : "Något gick fel"); } finally { setLoading(false); }
   }

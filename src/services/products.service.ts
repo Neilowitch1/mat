@@ -52,8 +52,8 @@ export async function searchProducts(query: string): Promise<Product[]> {
   return data ?? [];
 }
 
-export async function getProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
+export async function getProducts(client = supabase): Promise<Product[]> {
+  const { data, error } = await client
     .from("products")
     .select("*")
     .order("name");

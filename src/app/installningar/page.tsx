@@ -4,8 +4,10 @@ import AppCard from "@/components/AppCard";
 import AppHeader from "@/components/AppHeader";
 import AccountCard from "@/features/auth/AccountCard";
 import HouseholdSettings from "@/features/auth/HouseholdSettings";
+import { requireOnboardedUser } from "@/lib/auth";
 
-export default function InstallningarPage() {
+export default async function InstallningarPage() {
+  await requireOnboardedUser();
   return (
     <>
       <AppHeader

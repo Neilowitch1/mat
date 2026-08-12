@@ -20,27 +20,28 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // Validating the user refreshes expired sessions and writes fresh cookies.
-  const { data: { user } } = await supabase.auth.getUser();
+  // getClaims validates the JWT and refreshes expired sessions without an
+  // unconditional Auth server round trip for every navigation.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims;
   const privatePath = /^\/(hemma|handla|inventarie|recept|installningar|onboarding)(\/|$)/.test(request.nextUrl.pathname);
-  if (!user && privatePath) {
+  if (!claims && privatePath) {
     const loginUrl = new URL("/logga-in", request.url);
     loginUrl.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
     const redirect = NextResponse.redirect(loginUrl);
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return redirect;
   }
-  if (user && privatePath && request.nextUrl.pathname !== "/onboarding") {
-    const { data: profile } = await supabase.from("profiles").select("active_household_id").eq("id", user.id).maybeSingle();
-    if (!profile?.active_household_id) {
-      const redirect = NextResponse.redirect(new URL("/onboarding", request.url));
-      response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
-      return redirect;
-    }
-  }
   return response;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/hemma/:path*",
+    "/handla/:path*",
+    "/inventarie/:path*",
+    "/recept/:path*",
+    "/installningar/:path*",
+    "/onboarding/:path*",
+  ],
 };

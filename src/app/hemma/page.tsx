@@ -1,15 +1,14 @@
 import AppHeader from "@/components/AppHeader";
 import InventoryList from "@/features/inventory/components/InventoryList";
 import { getInventory } from "@/services/inventory.service";
-import { connection } from "next/server";
 import { HomeIcon } from "@/components/navigationItems";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { requireOnboardedUser } from "@/lib/auth";
 
 export default async function HemmaPage() {
-  await connection();
-
+  const { activeHouseholdId } = await requireOnboardedUser();
   const supabase = await createSupabaseServerClient();
-  const inventoryItems = await getInventory(supabase);
+  const inventoryItems = await getInventory(supabase, activeHouseholdId);
 
   return (
     <>

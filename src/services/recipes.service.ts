@@ -40,8 +40,8 @@ async function updateIngredientDefaultUnits(
   );
 }
 
-export async function getRecipes(client = supabase): Promise<Recipe[]> {
-  const householdId = await getActiveHouseholdId(client);
+export async function getRecipes(client = supabase, activeHouseholdId?: string): Promise<Recipe[]> {
+  const householdId = activeHouseholdId ?? await getActiveHouseholdId(client);
   const { data, error } = await client
     .from("recipes")
     .select("*, ingredients:recipe_ingredients(*)")
@@ -53,8 +53,8 @@ export async function getRecipes(client = supabase): Promise<Recipe[]> {
   return data ?? [];
 }
 
-export async function getRecipe(id: string, client = supabase): Promise<Recipe | null> {
-  const householdId = await getActiveHouseholdId(client);
+export async function getRecipe(id: string, client = supabase, activeHouseholdId?: string): Promise<Recipe | null> {
+  const householdId = activeHouseholdId ?? await getActiveHouseholdId(client);
   const { data, error } = await client
     .from("recipes")
     .select(`

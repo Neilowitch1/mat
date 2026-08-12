@@ -149,10 +149,10 @@ export async function getInventoryItemsByProduct(
   return data ?? [];
 }
 
-export async function getInventory(client = supabase): Promise<
+export async function getInventory(client = supabase, activeHouseholdId?: string): Promise<
   InventoryItem[]
 > {
-  const householdId = await getActiveHouseholdId(client);
+  const householdId = activeHouseholdId ?? await getActiveHouseholdId(client);
   const { data, error } = await client
     .from("inventory")
     .select(`
