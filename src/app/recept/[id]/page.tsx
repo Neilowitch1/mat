@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import RecipeDetails from "@/features/recipes/components/RecipeDetails";
 import { getInventory } from "@/services/inventory.service";
 import { getRecipe } from "@/services/recipes.service";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 interface RecipeDetailPageProps {
   params: Promise<{ id: string }>;
@@ -13,7 +14,11 @@ interface RecipeDetailPageProps {
 export default async function RecipeDetailPage({ params }: RecipeDetailPageProps) {
   await connection();
   const { id } = await params;
-  const [recipe, inventoryItems] = await Promise.all([getRecipe(id), getInventory()]);
+  const supabase = await createSupabaseServerClient();
+  const [recipe, inventoryItems] = await Promise.all([
+    getRecipe(id, supabase),
+    getInventory(supabase),
+  ]);
 
   if (!recipe) notFound();
 

@@ -655,13 +655,11 @@ export default function ShoppingList({
             </div>
 
             <h2 className="text-base font-semibold">
-              Listan är tom
+              Inköpslistan är tom
             </h2>
 
             <p className="mt-1 max-w-56 text-sm leading-6 text-muted-foreground">
-              Sök efter en vara ovan
-              för att börja planera
-              dina inköp.
+              Lägg till din första vara ovan för att börja planera inköpen.
             </p>
           </div>
         </AppCard>

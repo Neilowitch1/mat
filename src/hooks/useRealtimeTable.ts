@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { getActiveHouseholdId } from "@/lib/householdContext";
 
 type RealtimeTable = "shopping_list" | "inventory";
 
@@ -26,19 +27,34 @@ export function useRealtimeTable(
   }, [onChange]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`public:${table}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table },
-        (payload) => {
-          void onChangeRef.current(payload);
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    void getActiveHouseholdId()
+      .then((householdId) => {
+        if (cancelled) return;
+
+        channel = supabase
+          .channel(`public:${table}:${householdId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table,
+              filter: `household_id=eq.${householdId}`,
+            },
+            (payload) => {
+              void onChangeRef.current(payload);
+            }
+          )
+          .subscribe();
+      })
+      .catch(() => undefined);
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [table]);
 }

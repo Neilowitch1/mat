@@ -1,0 +1,19 @@
+-- Rename this file to end in .sql only after login/onboarding is deployed and
+-- the legacy household has at least one authenticated owner.
+begin;
+
+drop policy if exists "Legacy anonymous shopping access" on public.shopping_list;
+drop policy if exists "Legacy anonymous inventory access" on public.inventory;
+drop policy if exists "Legacy anonymous recipe access" on public.recipes;
+drop policy if exists "Legacy anonymous recipe ingredient access" on public.recipe_ingredients;
+
+alter table public.shopping_list alter column household_id drop default;
+alter table public.inventory alter column household_id drop default;
+alter table public.recipes alter column household_id drop default;
+
+revoke insert, update, delete on table public.products from anon;
+drop policy if exists "Allow anonymous insert on products" on public.products;
+drop policy if exists "Allow anonymous update on products" on public.products;
+drop policy if exists "Allow anonymous delete on products" on public.products;
+
+commit;

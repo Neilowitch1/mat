@@ -1,12 +1,46 @@
 import { supabase } from "@/lib/supabase";
 import { normalizeStoredUnit } from "@/lib/unitConversion";
 import { normalizeProductDisplayName } from "@/lib/productName";
+import { getActiveHouseholdId } from "@/lib/householdContext";
 import type { Product } from "@/types/database";
 
 export async function searchProducts(query: string): Promise<Product[]> {
+  const householdId = await getActiveHouseholdId();
+  const [
+    { data: inventory, error: inventoryError },
+    { data: shopping, error: shoppingError },
+    { data: recipes, error: recipeError },
+  ] =
+    await Promise.all([
+      supabase.from("inventory").select("product_id").eq("household_id", householdId),
+      supabase.from("shopping_list").select("product_id").eq("household_id", householdId),
+      supabase.from("recipes").select("id").eq("household_id", householdId),
+    ]);
+
+  if (inventoryError) throw inventoryError;
+  if (shoppingError) throw shoppingError;
+  if (recipeError) throw recipeError;
+
+  const recipeIds = (recipes ?? []).map((recipe) => recipe.id);
+  const { data: ingredients, error: ingredientError } = recipeIds.length
+    ? await supabase.from("recipe_ingredients").select("product_id").in("recipe_id", recipeIds)
+    : { data: [], error: null };
+
+  if (ingredientError) throw ingredientError;
+
+  const productIds = [
+    ...(inventory ?? []).map((item) => item.product_id),
+    ...(shopping ?? []).map((item) => item.product_id),
+    ...(ingredients ?? []).map((item) => item.product_id),
+  ];
+  const uniqueProductIds = [...new Set(productIds)];
+
+  if (uniqueProductIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("products")
     .select("*")
+    .in("id", uniqueProductIds)
     .ilike("name", `%${query}%`)
     .order("name")
     .limit(8);

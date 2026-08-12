@@ -1,6 +1,8 @@
 # ARCHITECTURE.md
 
-# MAT – Architecture
+# Kökshyllan – Architecture
+
+> **Current ownership model (2026-08-11):** Kökshyllan is being migrated to Supabase Auth and multiple households. `profiles`, `households`, and `household_members` define identity and membership. `shopping_list`, `inventory`, and `recipes` are household-owned; `recipe_ingredients` inherits ownership from its recipe; `products` remains a global catalog. The older single-household description below is historical. See `.docs/MULTI_HOUSEHOLD_MIGRATION.md` for the temporary legacy bridge and production cutover.
 
 ## Vision
 
@@ -23,7 +25,7 @@ Appen ska kännas som en native iOS/Android-app trots att den är byggd med Next
 
 # Data Ownership
 
-MAT är en app för ett enda gemensamt hushåll utan användarkonton eller login.
+Kökshyllan är en app för ett enda gemensamt hushåll utan användarkonton eller login.
 
 Alla klienter som öppnar samma publicerade webbadress använder samma globala data i Supabase. Tabeller som `products`, `shopping_list`, `inventory` och framtida `recipes` ska därför inte innehålla `user_id` eller `household_id` för dataisolering.
 

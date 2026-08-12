@@ -1,0 +1,41 @@
+"use client";
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase";
+
+type Mode = "login" | "signup" | "forgot" | "reset";
+export default function AuthForm({ mode, nextPath }: { mode: Mode; nextPath?: string }) {
+  const router = useRouter(); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [loading, setLoading] = useState(false); const [sent, setSent] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setLoading(true);
+    try {
+      if (mode === "login") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password }); if (error) throw error;
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase.from("profiles").select("active_household_id").eq("id", user!.id).maybeSingle();
+        router.replace(nextPath ?? (profile?.active_household_id ? "/hemma" : "/onboarding")); router.refresh();
+      } else if (mode === "signup") {
+        const destination = nextPath ?? "/onboarding";
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(destination)}` } }); if (error) throw error;
+        if (data.session) { router.replace(destination); router.refresh(); } else setSent(true);
+      } else if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/callback?next=/aterstall-losenord` }); if (error) throw error; setSent(true);
+      } else {
+        const { error } = await supabase.auth.updateUser({ password }); if (error) throw error; toast.success("Lösenordet är uppdaterat"); router.replace("/hemma"); router.refresh();
+      }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Något gick fel"); } finally { setLoading(false); }
+  }
+  if (sent) return <p className="text-sm leading-6">Kontrollera din e-post och följ länken för att fortsätta.</p>;
+  const loadingLabel = mode === "login" ? "Loggar in…" : mode === "signup" ? "Skapar konto…" : mode === "forgot" ? "Skickar länk…" : "Sparar lösenord…";
+  return <form onSubmit={submit} className="space-y-4">
+    {mode !== "reset" && <Input type="email" autoComplete="email" placeholder="E-post" value={email} onChange={(e) => setEmail(e.target.value)} required />}
+    {mode !== "forgot" && <Input type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder={mode === "reset" ? "Nytt lösenord" : "Lösenord"} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />}
+    <Button type="submit" className="w-full" disabled={loading}>{loading ? loadingLabel : mode === "login" ? "Logga in" : mode === "signup" ? "Skapa konto" : mode === "forgot" ? "Skicka återställningslänk" : "Spara nytt lösenord"}</Button>
+    {mode === "login" && <div className="flex justify-between text-sm"><Link href={nextPath ? `/skapa-konto?next=${encodeURIComponent(nextPath)}` : "/skapa-konto"} className="text-primary">Skapa konto</Link><Link href="/glomt-losenord" className="text-muted-foreground">Glömt lösenord?</Link></div>}
+    {mode === "signup" && <p className="text-center text-sm text-muted-foreground">Har du redan ett konto? <Link href={nextPath ? `/logga-in?next=${encodeURIComponent(nextPath)}` : "/logga-in"} className="text-primary">Logga in</Link></p>}
+  </form>;
+}

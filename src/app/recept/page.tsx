@@ -5,12 +5,14 @@ import { getInventory } from "@/services/inventory.service";
 import { getProducts } from "@/services/products.service";
 import { getRecipes } from "@/services/recipes.service";
 import { BookOpen } from "lucide-react";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export default async function ReceptPage() {
   await connection();
+  const supabase = await createSupabaseServerClient();
   const [recipes, inventoryItems, products] = await Promise.all([
-    getRecipes(),
-    getInventory(),
+    getRecipes(supabase),
+    getInventory(supabase),
     getProducts(),
   ]);
 

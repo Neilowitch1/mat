@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getActiveHouseholdId } from "@/lib/householdContext";
 import {
   mergeCompatibleQuantities,
   normalizeStoredUnit,
@@ -108,12 +109,14 @@ async function getInventoryItemsByProductAndLocation(
   productId: string,
   location: InventoryLocation
 ): Promise<InventoryItem[]> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("inventory")
     .select(`
       *,
       product:products(*)
     `)
+    .eq("household_id", householdId)
     .eq("product_id", productId)
     .eq("location", location)
     .order("created_at", {
@@ -128,12 +131,14 @@ async function getInventoryItemsByProductAndLocation(
 export async function getInventoryItemsByProduct(
   productId: string
 ): Promise<InventoryItem[]> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("inventory")
     .select(`
       *,
       product:products(*)
     `)
+    .eq("household_id", householdId)
     .eq("product_id", productId)
     .order("created_at", {
       ascending: true,
@@ -144,15 +149,17 @@ export async function getInventoryItemsByProduct(
   return data ?? [];
 }
 
-export async function getInventory(): Promise<
+export async function getInventory(client = supabase): Promise<
   InventoryItem[]
 > {
-  const { data, error } = await supabase
+  const householdId = await getActiveHouseholdId(client);
+  const { data, error } = await client
     .from("inventory")
     .select(`
       *,
       product:products(*)
     `)
+    .eq("household_id", householdId)
     .order("created_at", {
       ascending: true,
     });
@@ -165,12 +172,14 @@ export async function getInventory(): Promise<
 export async function getInventoryItem(
   id: string
 ): Promise<InventoryItem | null> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("inventory")
     .select(`
       *,
       product:products(*)
     `)
+    .eq("household_id", householdId)
     .eq("id", id)
     .maybeSingle();
 
@@ -182,9 +191,11 @@ export async function getInventoryItem(
 export async function removeInventoryItem(
   id: string
 ): Promise<void> {
+  const householdId = await getActiveHouseholdId();
   const { error } = await supabase
     .from("inventory")
     .delete()
+    .eq("household_id", householdId)
     .eq("id", id);
 
   if (error) throw error;
@@ -195,9 +206,11 @@ async function removeEmptyInventoryItemsForProductAndLocation(
   location: InventoryLocation,
   excludeId?: string
 ): Promise<void> {
+  const householdId = await getActiveHouseholdId();
   let query = supabase
     .from("inventory")
     .delete()
+    .eq("household_id", householdId)
     .eq("product_id", productId)
     .eq("location", location)
     .eq("status", "empty");
@@ -298,12 +311,14 @@ async function insertInventoryItem({
   location: InventoryLocation;
   expiresAt: string | null;
 }): Promise<InventoryItem> {
+  const householdId = await getActiveHouseholdId();
   const normalizedUnit =
     normalizeStoredUnit(unit);
 
   const { data, error } = await supabase
     .from("inventory")
     .insert({
+      household_id: householdId,
       product_id: productId,
       quantity,
       unit: normalizedUnit,
@@ -336,6 +351,7 @@ async function insertInventoryItem({
         await supabase
           .from("inventory")
           .delete()
+          .eq("household_id", householdId)
           .eq("id", data.id);
 
       if (rollbackError) {
@@ -697,11 +713,13 @@ export async function updateInventoryQuantity(
   id: string,
   quantity: number
 ): Promise<InventoryItem> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("inventory")
     .update({
       quantity,
     })
+    .eq("household_id", householdId)
     .eq("id", id)
     .select(`
       *,
@@ -725,6 +743,7 @@ export async function updateInventoryItem(
     expiresAt,
   }: UpdateInventoryItemInput
 ): Promise<UpdateInventoryItemResult> {
+  const householdId = await getActiveHouseholdId();
   /*
    * Vi blockerar INTE längre en annan rad
    * med samma product_id + location.
@@ -755,6 +774,7 @@ export async function updateInventoryItem(
       location,
       expires_at: expiresAt,
     })
+    .eq("household_id", householdId)
     .eq("id", id)
     .select(`
       *,
@@ -794,6 +814,7 @@ export async function updateInventoryItem(
             expires_at:
               previousItem.expires_at,
           })
+          .eq("household_id", householdId)
           .eq("id", id);
 
       if (rollbackError) {
@@ -820,11 +841,13 @@ export async function updateInventoryStatus(
   id: string,
   status: InventoryStatus
 ): Promise<InventoryItem> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("inventory")
     .update({
       status,
     })
+    .eq("household_id", householdId)
     .eq("id", id)
     .select(`
       *,
@@ -841,11 +864,13 @@ export async function updateInventoryExpiration(
   id: string,
   expiresAt: string | null
 ): Promise<InventoryItem> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("inventory")
     .update({
       expires_at: expiresAt,
     })
+    .eq("household_id", householdId)
     .eq("id", id)
     .select(`
       *,

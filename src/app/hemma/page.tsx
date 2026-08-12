@@ -3,11 +3,13 @@ import InventoryList from "@/features/inventory/components/InventoryList";
 import { getInventory } from "@/services/inventory.service";
 import { connection } from "next/server";
 import { HomeIcon } from "@/components/navigationItems";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export default async function HemmaPage() {
   await connection();
 
-  const inventoryItems = await getInventory();
+  const supabase = await createSupabaseServerClient();
+  const inventoryItems = await getInventory(supabase);
 
   return (
     <>

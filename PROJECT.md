@@ -1,4 +1,6 @@
-# MAT
+# Kökshyllan
+
+> **Current ownership model (2026-08-11):** the database is prepared for Supabase Auth and multiple households. Private app data is isolated by `household_id` and RLS, while `products` remains a global catalog. The older single-household description below is historical during the UI transition. See `.docs/MULTI_HOUSEHOLD_MIGRATION.md`.
 
 ## Vision
 

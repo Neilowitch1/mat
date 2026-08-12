@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getActiveHouseholdId } from "@/lib/householdContext";
 import { updateProductDefaultUnit } from "@/services/products.service";
 import type { Recipe, RecipeIngredient } from "@/types/database";
 
@@ -39,10 +40,12 @@ async function updateIngredientDefaultUnits(
   );
 }
 
-export async function getRecipes(): Promise<Recipe[]> {
-  const { data, error } = await supabase
+export async function getRecipes(client = supabase): Promise<Recipe[]> {
+  const householdId = await getActiveHouseholdId(client);
+  const { data, error } = await client
     .from("recipes")
     .select("*, ingredients:recipe_ingredients(*)")
+    .eq("household_id", householdId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -50,8 +53,9 @@ export async function getRecipes(): Promise<Recipe[]> {
   return data ?? [];
 }
 
-export async function getRecipe(id: string): Promise<Recipe | null> {
-  const { data, error } = await supabase
+export async function getRecipe(id: string, client = supabase): Promise<Recipe | null> {
+  const householdId = await getActiveHouseholdId(client);
+  const { data, error } = await client
     .from("recipes")
     .select(`
       *,
@@ -60,6 +64,7 @@ export async function getRecipe(id: string): Promise<Recipe | null> {
         product:products(*)
       )
     `)
+    .eq("household_id", householdId)
     .eq("id", id)
     .maybeSingle();
 
@@ -78,9 +83,11 @@ export async function createRecipe({
   favorite = false,
   category = "cooking",
 }: CreateRecipeInput): Promise<Recipe> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("recipes")
     .insert({
+      household_id: householdId,
       name,
       description,
       instructions,
@@ -340,12 +347,14 @@ export async function updateRecipe(
   id: string,
   input: UpdateRecipeInput
 ): Promise<Recipe> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("recipes")
     .update({
       ...input,
       updated_at: new Date().toISOString(),
     })
+    .eq("household_id", householdId)
     .eq("id", id)
     .select()
     .single();
@@ -356,9 +365,11 @@ export async function updateRecipe(
 }
 
 export async function deleteRecipe(id: string): Promise<void> {
+  const householdId = await getActiveHouseholdId();
   const { error } = await supabase
     .from("recipes")
     .delete()
+    .eq("household_id", householdId)
     .eq("id", id);
 
   if (error) throw error;

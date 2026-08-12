@@ -1,0 +1,2 @@
+import AuthShell from "@/components/AuthShell"; import AuthForm from "@/features/auth/AuthForm";
+export default async function SignupPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) { const { next } = await searchParams; const nextPath = next?.startsWith("/") && !next.startsWith("//") ? next : undefined; return <AuthShell title="Skapa konto" subtitle="Börja med e-post och lösenord. Du väljer hushåll i nästa steg."><AuthForm mode="signup" nextPath={nextPath} /></AuthShell>; }

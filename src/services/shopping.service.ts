@@ -1,13 +1,16 @@
 import { supabase } from "@/lib/supabase";
+import { getActiveHouseholdId } from "@/lib/householdContext";
 import type { ShoppingItem } from "@/types/database";
 
-export async function getShoppingList(): Promise<ShoppingItem[]> {
-  const { data, error } = await supabase
+export async function getShoppingList(client = supabase): Promise<ShoppingItem[]> {
+  const householdId = await getActiveHouseholdId(client);
+  const { data, error } = await client
     .from("shopping_list")
     .select(`
       *,
       product:products(*)
     `)
+    .eq("household_id", householdId)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
@@ -18,12 +21,14 @@ export async function getShoppingList(): Promise<ShoppingItem[]> {
 export async function getShoppingItem(
   id: string
 ): Promise<ShoppingItem | null> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("shopping_list")
     .select(`
       *,
       product:products(*)
     `)
+    .eq("household_id", householdId)
     .eq("id", id)
     .maybeSingle();
 
@@ -47,12 +52,14 @@ const UNIQUE_VIOLATION_CODE = "23505";
 async function getShoppingItemByProductId(
   productId: string
 ): Promise<ShoppingItem | null> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("shopping_list")
     .select(`
       *,
       product:products(*)
     `)
+    .eq("household_id", householdId)
     .eq("product_id", productId)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -66,6 +73,7 @@ async function getShoppingItemByProductId(
 export async function addToShoppingList(
   productId: string
 ): Promise<AddToShoppingListResult> {
+  const householdId = await getActiveHouseholdId();
   const existingItem = await getShoppingItemByProductId(productId);
 
   if (existingItem) {
@@ -75,6 +83,7 @@ export async function addToShoppingList(
   const { data, error } = await supabase
     .from("shopping_list")
     .insert({
+      household_id: householdId,
       product_id: productId,
       completed: false,
     })
@@ -102,9 +111,11 @@ export async function addToShoppingList(
 }
 
 export async function removeShoppingItem(id: string) {
+  const householdId = await getActiveHouseholdId();
   const { error } = await supabase
     .from("shopping_list")
     .delete()
+    .eq("household_id", householdId)
     .eq("id", id);
 
   if (error) throw error;
@@ -114,6 +125,7 @@ export async function updateShoppingItemProduct(
   id: string,
   productId: string
 ): Promise<UpdateShoppingItemProductResult> {
+  const householdId = await getActiveHouseholdId();
   const existingItem = await getShoppingItemByProductId(productId);
 
   if (existingItem && existingItem.id !== id) {
@@ -125,6 +137,7 @@ export async function updateShoppingItemProduct(
   const { data, error } = await supabase
     .from("shopping_list")
     .update({ product_id: productId })
+    .eq("household_id", householdId)
     .eq("id", id)
     .select(`
       *,
@@ -147,9 +160,11 @@ export async function toggleShoppingItemCompleted(
   id: string,
   completed: boolean
 ): Promise<ShoppingItem> {
+  const householdId = await getActiveHouseholdId();
   const { data, error } = await supabase
     .from("shopping_list")
     .update({ completed })
+    .eq("household_id", householdId)
     .eq("id", id)
     .select(`
       *,
@@ -167,9 +182,11 @@ export async function toggleShoppingItemCompleted(
 }
 
 export async function clearShoppingList(): Promise<void> {
+  const householdId = await getActiveHouseholdId();
   const { error } = await supabase
     .from("shopping_list")
     .delete()
+    .eq("household_id", householdId)
     .not("id", "is", null);
 
   if (error) {

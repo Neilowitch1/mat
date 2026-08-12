@@ -1,0 +1,2 @@
+import AuthShell from "@/components/AuthShell"; import AuthForm from "@/features/auth/AuthForm";
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) { const { next } = await searchParams; const nextPath = next?.startsWith("/") && !next.startsWith("//") ? next : undefined; return <AuthShell title="Välkommen tillbaka" subtitle="Logga in för att använda ditt hushåll på alla enheter."><AuthForm mode="login" nextPath={nextPath} /></AuthShell>; }

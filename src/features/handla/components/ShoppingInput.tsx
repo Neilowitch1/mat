@@ -4,7 +4,7 @@ import { Plus, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import { createProduct, searchProducts } from "@/services/products.service";
+import { getOrCreateProduct, searchProducts } from "@/services/products.service";
 import { addToShoppingList } from "@/services/shopping.service";
 import type { Product, ShoppingItem } from "@/types/database";
 
@@ -131,7 +131,7 @@ export default function ShoppingInput({
     setIsSubmitting(true);
 
     try {
-      const product = await createProduct(trimmedQuery);
+      const product = await getOrCreateProduct(trimmedQuery);
 
       await addProductToShoppingList(product);
     } catch (error) {

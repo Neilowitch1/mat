@@ -3,11 +3,13 @@ import ShoppingList from "@/features/handla/components/ShoppingList";
 import { getShoppingList } from "@/services/shopping.service";
 import { connection } from "next/server";
 import { ShoppingBasket } from "lucide-react";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export default async function HandlaPage() {
   await connection();
 
-  const shoppingItems = await getShoppingList();
+  const supabase = await createSupabaseServerClient();
+  const shoppingItems = await getShoppingList(supabase);
 
   return (
     <>

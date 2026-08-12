@@ -1,5 +1,6 @@
-import { Search, type LucideIcon } from "lucide-react";
+import { Search, Settings, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+
 import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
@@ -8,7 +9,11 @@ interface AppHeaderProps {
   searchHref?: string;
   icon?: LucideIcon;
   className?: string;
+  showSettings?: boolean;
 }
+
+const actionClassName =
+  "flex size-10 items-center justify-center rounded-full border border-border bg-card text-primary shadow-[0_5px_16px_rgba(57,62,55,0.05)] hover:bg-secondary active:scale-95";
 
 export default function AppHeader({
   title,
@@ -16,6 +21,7 @@ export default function AppHeader({
   searchHref,
   icon: Icon,
   className,
+  showSettings = true,
 }: AppHeaderProps) {
   return (
     <header className={cn("mb-5", className)}>
@@ -30,7 +36,6 @@ export default function AppHeader({
             <h1 className="truncate text-[1.75rem] font-bold tracking-[-0.035em] text-primary">
               {title}
             </h1>
-
             {subtitle && (
               <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">
                 {subtitle}
@@ -39,15 +44,22 @@ export default function AppHeader({
           </div>
         </div>
 
-        {searchHref && (
-          <Link
-            href={searchHref}
-            aria-label="Sök"
-            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-primary shadow-[0_5px_16px_rgba(57,62,55,0.05)] hover:bg-secondary active:scale-95"
-          >
-            <Search size={19} />
-          </Link>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {searchHref && (
+            <Link href={searchHref} aria-label="Sök" className={actionClassName}>
+              <Search aria-hidden="true" size={19} />
+            </Link>
+          )}
+          {showSettings && (
+            <Link
+              href="/installningar"
+              aria-label="Inställningar"
+              className={actionClassName}
+            >
+              <Settings aria-hidden="true" size={19} />
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );

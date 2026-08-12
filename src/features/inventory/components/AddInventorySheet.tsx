@@ -32,7 +32,7 @@ import {
 } from "@/lib/unitConversion";
 
 import {
-  createProduct,
+  getOrCreateProduct,
   searchProducts,
 } from "@/services/products.service";
 
@@ -575,7 +575,7 @@ export default function AddInventorySheet({
         selection.kind ===
         "existing"
           ? selection.product
-          : await createProduct(
+          : await getOrCreateProduct(
               selection.name
             );
 

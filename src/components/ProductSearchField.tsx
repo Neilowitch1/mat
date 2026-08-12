@@ -12,7 +12,7 @@ import {
 
 import { Input } from "@/components/ui/input";
 import {
-  createProduct,
+  getOrCreateProduct,
   searchProducts,
 } from "@/services/products.service";
 
@@ -217,7 +217,7 @@ const ProductSearchField = forwardRef<
 
     try {
       const createdProduct =
-        await createProduct(trimmedQuery);
+        await getOrCreateProduct(trimmedQuery);
 
       selectProduct(createdProduct);
     } catch {

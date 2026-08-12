@@ -1,0 +1,105 @@
+"use client";
+
+import { Crown, LoaderCircle, RefreshCw, ShieldMinus, Trash2, UsersRound } from "lucide-react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import AppCard from "@/components/AppCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { supabase } from "@/lib/supabase";
+import { acceptHouseholdInvitation, createJoinCode, demoteHouseholdOwner, getHouseholdMembers, getHouseholds, leaveHousehold, removeHouseholdMember, transferHouseholdOwnership } from "@/services/households.service";
+import type { HouseholdMemberDetails } from "@/types/database";
+
+export default function HouseholdSettings() {
+  const router = useRouter();
+  const [householdId, setHouseholdId] = useState<string | null>(null);
+  const [householdName, setHouseholdName] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [members, setMembers] = useState<HouseholdMemberDetails[]>([]);
+  const [email, setEmail] = useState("");
+  const [joinInput, setJoinInput] = useState("");
+  const [joinCode, setJoinCode] = useState<{ code: string; expires_at: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>("load");
+  const [pendingAction, setPendingAction] = useState<{ kind: "remove" | "leave" | "demote"; member?: HouseholdMemberDetails } | null>(null);
+
+  const load = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setBusy(null); return; }
+    const { data: profile, error } = await supabase.from("profiles").select("active_household_id").eq("id", user.id).single();
+    if (error) throw error;
+    const id = profile.active_household_id;
+    setUserId(user.id); setHouseholdId(id);
+    if (!id) { setBusy(null); return; }
+    const [households, householdMembers] = await Promise.all([getHouseholds(), getHouseholdMembers(id)]);
+    setHouseholdName(households.find((item) => item.id === id)?.name ?? "Hushåll");
+    setMembers(householdMembers); setBusy(null);
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void load().catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : "Kunde inte hämta hushållet");
+        setBusy(null);
+      });
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [load]);
+  const me = members.find((member) => member.user_id === userId);
+  const isOwner = me?.role === "owner";
+  const ownerCount = members.filter((member) => member.role === "owner").length;
+
+  async function run(key: string, action: () => Promise<void>) {
+    setBusy(key);
+    try { await action(); await load(); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Något gick fel"); }
+    finally { setBusy(null); }
+  }
+
+  async function invite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!householdId) return;
+    await run("email", async () => {
+      const response = await fetch("/api/household-invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ householdId, email }) });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Kunde inte skicka inbjudan.");
+      setEmail(""); toast.success("Inbjudan är skickad");
+    });
+  }
+
+  async function join(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("join", async () => { await acceptHouseholdInvitation(joinInput); toast.success("Du har gått med i hushållet"); router.replace("/hemma"); router.refresh(); });
+  }
+
+  async function confirmPendingAction() {
+    if (!pendingAction || !householdId) return;
+    const action = pendingAction;
+    setPendingAction(null);
+    if (action.kind === "leave") {
+      await run("leave", async () => { await leaveHousehold(householdId); router.replace("/onboarding"); router.refresh(); });
+    } else if (action.kind === "remove" && action.member) {
+      await run(`remove-${action.member.user_id}`, async () => { await removeHouseholdMember(householdId, action.member!.user_id); toast.success("Medlemmen är borttagen"); });
+    } else if (action.kind === "demote" && action.member) {
+      await run(`demote-${action.member.user_id}`, async () => { await demoteHouseholdOwner(householdId, action.member!.user_id); toast.success("Rollen är ändrad till medlem"); });
+    }
+  }
+
+  if (busy === "load") return <p className="text-sm text-muted-foreground">Hämtar hushåll…</p>;
+  if (!userId) return <p className="text-sm text-muted-foreground">Logga in för att hantera eller gå med i ett hushåll.</p>;
+  if (!householdId) return <AppCard><h2 className="font-semibold">Gå med via kod</h2><p className="mt-1 text-xs text-muted-foreground">Skriv koden du fått av hushållets ägare.</p><form onSubmit={join} className="mt-3 flex gap-2"><Input value={joinInput} onChange={(event) => setJoinInput(event.target.value.toUpperCase().replace(/[^A-F0-9]/g, "").slice(0, 8))} className="font-mono uppercase tracking-widest" placeholder="XXXXXXXX" minLength={8} maxLength={8} required/><Button type="submit" disabled={busy !== null || joinInput.length !== 8}>{busy === "join" ? <LoaderCircle className="animate-spin"/> : "Anslut"}</Button></form></AppCard>;
+
+  return <div className="space-y-4">
+    <section aria-labelledby="members-heading"><div className="mb-2 px-1"><h2 id="members-heading" className="font-semibold">Medlemmar</h2><p className="text-xs text-muted-foreground">{householdName} · {members.length} {members.length === 1 ? "medlem" : "medlemmar"}</p></div>
+      <AppCard className="divide-y divide-border p-0">{members.map((member) => <div key={member.user_id} className="flex items-center gap-3 px-4 py-3.5"><span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary">{member.role === "owner" ? <Crown size={17}/> : <UsersRound size={17}/>}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{member.display_name || member.email}{member.user_id === userId ? " (du)" : ""}</p><p className="truncate text-xs text-muted-foreground">{member.role === "owner" ? "Ägare" : "Medlem"}{member.display_name ? ` · ${member.email}` : ""}</p></div>
+        {isOwner && member.user_id !== userId && <div className="flex gap-1">{member.role === "member" ? <Button size="icon" variant="ghost" title="Gör till ägare" disabled={busy !== null} onClick={() => void run(`owner-${member.user_id}`, async () => { await transferHouseholdOwnership(householdId, member.user_id); toast.success("Medlemmen är nu ägare"); })}><Crown/></Button> : <Button size="icon" variant="ghost" title="Ändra till medlem" disabled={busy !== null || ownerCount <= 1} onClick={() => setPendingAction({ kind: "demote", member })}><ShieldMinus/></Button>}<Button size="icon" variant="ghost" title="Ta bort medlem" className="text-destructive" disabled={busy !== null || (member.role === "owner" && ownerCount <= 1)} onClick={() => setPendingAction({ kind: "remove", member })}><Trash2/></Button></div>}
+      </div>)}</AppCard></section>
+
+    {isOwner && <AppCard className="space-y-5"><section><h2 className="font-semibold">Bjud in via e-post</h2><p className="mt-1 text-xs text-muted-foreground">Vi skickar en personlig, säker länk som gäller i sju dagar.</p><form onSubmit={invite} className="mt-3 flex gap-2"><Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="namn@exempel.se" required/><Button type="submit" disabled={busy !== null || !email.trim()}>{busy === "email" && <LoaderCircle className="animate-spin"/>}Bjud in</Button></form></section><div className="border-t border-border"/><section><h2 className="font-semibold">Anslutningskod</h2><p className="mt-1 text-xs text-muted-foreground">Engångsbar och giltig i fem minuter.</p>{joinCode && <div className="mt-3 rounded-[18px] bg-accent px-4 py-3 text-center"><p className="font-mono text-2xl font-bold tracking-[0.18em]">{joinCode.code}</p><p className="mt-1 text-xs text-muted-foreground">Giltig till {new Date(joinCode.expires_at).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</p></div>}<Button variant="outline" className="mt-3 w-full" disabled={busy !== null} onClick={() => void run("code", async () => setJoinCode(await createJoinCode(householdId)))}>{busy === "code" ? <LoaderCircle className="animate-spin"/> : <RefreshCw/>}{joinCode ? "Förnya kod" : "Skapa kod"}</Button></section></AppCard>}
+
+    <AppCard><h2 className="font-semibold">Gå med via kod</h2><p className="mt-1 text-xs text-muted-foreground">Skriv koden du fått av hushållets ägare.</p><form onSubmit={join} className="mt-3 flex gap-2"><Input value={joinInput} onChange={(event) => setJoinInput(event.target.value.toUpperCase().replace(/[^A-F0-9]/g, "").slice(0, 8))} className="font-mono uppercase tracking-widest" placeholder="XXXXXXXX" minLength={8} maxLength={8} required/><Button type="submit" disabled={busy !== null || joinInput.length !== 8}>{busy === "join" ? <LoaderCircle className="animate-spin"/> : "Anslut"}</Button></form></AppCard>
+    <Button variant="outline" className="w-full text-destructive" disabled={busy !== null || (isOwner && ownerCount <= 1)} title={isOwner && ownerCount <= 1 ? "Gör först en annan medlem till ägare" : undefined} onClick={() => setPendingAction({ kind: "leave" })}>{busy === "leave" && <LoaderCircle className="animate-spin"/>}Lämna hushållet</Button>
+    {isOwner && ownerCount <= 1 && <p className="px-2 text-center text-xs text-muted-foreground">Du är sista ägaren. Gör en annan medlem till ägare innan du lämnar.</p>}
+    <Sheet open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null); }}><SheetContent side="bottom"><SheetHeader><SheetTitle>{pendingAction?.kind === "remove" ? "Ta bort medlem?" : pendingAction?.kind === "demote" ? "Ändra till medlem?" : "Lämna hushållet?"}</SheetTitle><SheetDescription>{pendingAction?.kind === "remove" ? `${pendingAction.member?.display_name || pendingAction.member?.email} förlorar åtkomst till ${householdName} och hushållets data.` : pendingAction?.kind === "demote" ? `${pendingAction.member?.display_name || pendingAction.member?.email} kan inte längre bjuda in eller hantera medlemmar. Personen är kvar i hushållet.` : `Du förlorar åtkomst till ${householdName} och dess data. En ägare kan bjuda in dig igen senare.`}</SheetDescription></SheetHeader><SheetFooter><Button variant="destructive" disabled={busy !== null} onClick={() => void confirmPendingAction()}>{pendingAction?.kind === "remove" ? "Ta bort medlem" : pendingAction?.kind === "demote" ? "Ändra till medlem" : "Lämna hushållet"}</Button><Button variant="outline" onClick={() => setPendingAction(null)}>Avbryt</Button></SheetFooter></SheetContent></Sheet>
+  </div>;
+}

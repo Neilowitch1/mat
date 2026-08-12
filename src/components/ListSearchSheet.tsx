@@ -104,7 +104,7 @@ export default function ListSearchSheet({
               ))}
             </ul>
           ) : (
-            <p className="py-8 text-center text-sm text-muted-foreground">Inga träffar</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Inga träffar. Prova ett annat sökord.</p>
           )}
         </div>
       </SheetContent>

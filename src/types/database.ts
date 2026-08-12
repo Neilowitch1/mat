@@ -6,6 +6,36 @@ export type InventoryLocation =
 
 export type RecipeCategory = "cooking" | "baking";
 
+export type HouseholdRole = "owner" | "member";
+
+export interface Profile {
+  id: string;
+  display_name: string | null;
+  active_household_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Household {
+  id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HouseholdMember {
+  household_id: string;
+  user_id: string;
+  role: HouseholdRole;
+  created_at: string;
+}
+
+export interface HouseholdMemberDetails extends HouseholdMember {
+  display_name: string | null;
+  email: string;
+}
+
 export type InventoryStatus =
   | "full"
   | "three_quarters"
@@ -23,6 +53,7 @@ export interface Product {
 
 export interface ShoppingItem {
   id: string;
+  household_id: string;
   product_id: string;
   checked: boolean;
   completed: boolean;
@@ -33,6 +64,7 @@ export interface ShoppingItem {
 
 export interface InventoryItem {
   id: string;
+  household_id: string;
   product_id: string;
   quantity: number;
   unit: string | null;
@@ -47,6 +79,7 @@ export interface InventoryItem {
 
 export interface Recipe {
   id: string;
+  household_id: string;
   name: string;
   description: string | null;
   instructions: string | null;

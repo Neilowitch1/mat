@@ -1,6 +1,6 @@
 # Designsystem
 
-MAT använder ett varmt, modernt skandinaviskt uttryck: lugnt, luftigt och snabbt, med känslan av en välgjord native-app. Gränssnittet byggs alltid mobile first och använder befintliga shadcn/ui-komponenter före speciallösningar.
+Kökshyllan använder ett varmt, modernt skandinaviskt uttryck: lugnt, luftigt och snabbt, med känslan av en välgjord native-app. Gränssnittet byggs alltid mobile first och använder befintliga shadcn/ui-komponenter före speciallösningar.
 
 ## Färger
 

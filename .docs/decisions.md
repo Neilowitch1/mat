@@ -8,7 +8,7 @@ Beslutad.
 
 ### Beslut
 
-MAT byggs för ett enda gemensamt hushåll. Appen har ingen login och alla enheter som använder samma publicerade webbadress läser och skriver samma data i Supabase.
+Kökshyllan byggs för ett enda gemensamt hushåll. Appen har ingen login och alla enheter som använder samma publicerade webbadress läser och skriver samma data i Supabase.
 
 - Implementera inte Supabase Auth.
 - Lägg inte till `user_id` eller `household_id` för att separera data.
