@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getActiveHouseholdId } from "@/lib/householdContext";
+import { revalidateShoppingList } from "@/services/shopping.actions";
 import type { ShoppingItem } from "@/types/database";
 
 export async function getShoppingList(client = supabase, activeHouseholdId?: string): Promise<ShoppingItem[]> {
@@ -106,6 +107,8 @@ export async function addToShoppingList(
   if (!data) {
     throw new Error("Kunde inte lägga till produkten i inköpslistan.");
   }
+
+  await revalidateShoppingList();
 
   return { shoppingItem: data, alreadyExists: false };
 }

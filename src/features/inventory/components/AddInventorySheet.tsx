@@ -7,6 +7,7 @@ import { PackagePlus, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { floatingActionButtonClassName } from "@/components/floatingActionButtonStyles";
+import { useInventoryCategories } from "@/hooks/useInventoryCategories";
 
 import {
   Sheet,
@@ -46,8 +47,7 @@ import type {
 import InventoryUnitField from "./InventoryUnitField";
 
 import {
-  inventoryLocationLabels,
-  inventoryLocations,
+  getInventoryCategoryOptions,
   inventoryStatuses,
   inventoryUnits,
 } from "./inventoryFormOptions";
@@ -126,6 +126,8 @@ export default function AddInventorySheet({
   onMarkAsNotCompleted,
   mode = "add",
 }: AddInventorySheetProps) {
+  const { categories, selectableCategories } = useInventoryCategories();
+  const { labels: inventoryLocationLabels, locations: inventoryLocations } = getInventoryCategoryOptions(selectableCategories.length > 0 ? selectableCategories : categories);
   const preselectedUnit =
     normalizeStoredUnit(
       preselectedProduct?.default_unit ||
@@ -473,7 +475,7 @@ export default function AddInventorySheet({
     setSearchResult(null);
     setSelection(null);
 
-    setLocation("pantry");
+    setLocation(inventoryLocations.find((category) => category.value === "pantry")?.value ?? inventoryLocations[0]?.value ?? "pantry");
     setStatus("full");
 
     setQuantity("1");
@@ -673,6 +675,10 @@ export default function AddInventorySheet({
       open={sheetOpen}
       onOpenChange={(open) => {
         setIsOpen(open);
+
+        if (open && !inventoryLocations.some((category) => category.value === location)) {
+          setLocation(inventoryLocations[0]?.value ?? "pantry");
+        }
 
         onOpenChange?.(open);
 

@@ -1,26 +1,28 @@
 "use client";
 
-import { Check, LoaderCircle, LogOut } from "lucide-react";
+import { Check, LoaderCircle, Mail, Save, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { toast } from "react-hot-toast";
 import type { User } from "@supabase/supabase-js";
 
+import AppCard from "@/components/AppCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getProfileDisplayName } from "@/lib/profile";
 import { supabase } from "@/lib/supabase";
-import {
-  getHouseholds,
-  setActiveHousehold,
-  type HouseholdWithMembership,
-} from "@/services/households.service";
+import { updateDisplayName } from "@/services/profiles.service";
+
+interface AccountProfile {
+  displayName: string | null;
+  user: User;
+}
 
 export default function AccountCard() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>();
-  const [households, setHouseholds] = useState<HouseholdWithMembership[]>([]);
-  const [activeHouseholdId, setActiveHouseholdId] = useState<string | null>(null);
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<AccountProfile | null>();
+  const [displayNameInput, setDisplayNameInput] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     let isCurrent = true;
@@ -28,20 +30,24 @@ export default function AccountCard() {
     async function loadAccount() {
       const { data } = await supabase.auth.getUser();
       if (!isCurrent) return;
-      setUser(data.user);
-      if (!data.user) return;
 
-      const [{ data: profile }, memberships] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("active_household_id")
-          .eq("id", data.user.id)
-          .maybeSingle(),
-        getHouseholds(),
-      ]);
+      if (!data.user) {
+        setProfile(null);
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
       if (!isCurrent) return;
-      setActiveHouseholdId(profile?.active_household_id ?? null);
-      setHouseholds(memberships);
+      setProfile({
+        displayName: profileData?.display_name ?? null,
+        user: data.user,
+      });
+      setDisplayNameInput(profileData?.display_name ?? "");
     }
 
     void loadAccount();
@@ -50,120 +56,108 @@ export default function AccountCard() {
     };
   }, []);
 
-  if (user === undefined) {
+  async function saveDisplayName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profile || isSaving) return;
+
+    setIsSaving(true);
+    setIsSaved(false);
+    try {
+      const displayName = await updateDisplayName(profile.user.id, displayNameInput);
+      setProfile((current) => current ? { ...current, displayName } : current);
+      setDisplayNameInput(displayName ?? "");
+      setIsSaved(true);
+      window.dispatchEvent(new CustomEvent("profile:updated"));
+      toast.success("Namnet är sparat");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Kunde inte spara namnet");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (profile === undefined) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircle aria-hidden="true" size={16} className="animate-spin" />
-        Hämtar konto…
-      </div>
+      <AppCard className="flex min-h-24 items-center justify-center">
+        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          <LoaderCircle aria-hidden="true" size={17} className="animate-spin" />
+          Hämtar profil…
+        </span>
+      </AppCard>
     );
   }
 
-  if (!user) {
+  if (!profile) {
     return (
-      <div className="space-y-3">
+      <AppCard className="space-y-3">
         <p className="text-sm leading-6 text-muted-foreground">
-          Du använder appens tillfälliga läge utan konto.
+          Logga in eller skapa ett konto för att se din profil.
         </p>
-        <Link
-          href="/logga-in"
-          className="flex h-11 w-full items-center justify-center rounded-2xl bg-primary px-4 text-sm font-medium text-primary-foreground"
-        >
-          Logga in
-        </Link>
-        <Link
-          href="/skapa-konto"
-          className="flex h-11 w-full items-center justify-center rounded-2xl border border-input bg-card px-4 text-sm font-medium"
-        >
-          Skapa konto
-        </Link>
-      </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Link
+            href="/logga-in"
+            className="flex min-h-12 items-center justify-center rounded-[18px] bg-primary px-4 text-sm font-semibold text-primary-foreground"
+          >
+            Logga in
+          </Link>
+          <Link
+            href="/skapa-konto"
+            className="flex min-h-12 items-center justify-center rounded-[18px] border border-input bg-card px-4 text-sm font-semibold"
+          >
+            Skapa konto
+          </Link>
+        </div>
+      </AppCard>
     );
   }
 
-  const activeHousehold = households.find(
-    (household) => household.id === activeHouseholdId,
-  );
+  const email = profile.user.email ?? "Ingen e-postadress";
+  const displayName = getProfileDisplayName(profile.displayName, email);
+  const normalizedInput = displayNameInput.trim();
+  const hasChanges = normalizedInput !== (profile.displayName ?? "");
 
   return (
-    <div className="space-y-6">
-      <section aria-labelledby="account-heading">
-        <p id="account-heading" className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Konto
-        </p>
-        <p className="mt-2 truncate font-semibold">{user.email}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Ditt personliga Kökshyllan-konto</p>
-      </section>
-
-      <div className="border-t border-border" />
-
-      <section aria-labelledby="household-heading">
-        <p id="household-heading" className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          Aktivt hushåll
-        </p>
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-[18px] bg-accent px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-accent-foreground">
-              {activeHousehold?.name ?? "Inget hushåll valt"}
-            </p>
-            {activeHousehold && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {activeHousehold.membership[0]?.role === "owner" ? "Ägare" : "Medlem"}
-              </p>
-            )}
-          </div>
-          {activeHousehold && <Check aria-label="Aktivt" size={19} className="shrink-0 text-primary" />}
+    <AppCard className="divide-y divide-border p-0">
+      <form onSubmit={saveDisplayName} className="px-5 py-4">
+        <div className="flex items-start gap-3.5">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-[17px] bg-accent text-accent-foreground">
+          <UserRound aria-hidden="true" size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <label htmlFor="display-name" className="text-xs font-medium text-muted-foreground">Namn</label>
+          <Input
+            id="display-name"
+            name="displayName"
+            autoComplete="name"
+            value={displayNameInput}
+            onChange={(event) => {
+              setDisplayNameInput(event.target.value);
+              setIsSaved(false);
+            }}
+            placeholder={displayName}
+            maxLength={80}
+            disabled={isSaving}
+            className="mt-1.5 min-h-11"
+          />
+          <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+            Visas för andra i dina hushåll. Lämna tomt för att använda {getProfileDisplayName(null, email)}.
+          </p>
         </div>
-
-        {households.length > 1 && (
-          <div className="mt-3 grid gap-2">
-            {households
-              .filter((household) => household.id !== activeHouseholdId)
-              .map((household) => (
-                <Button
-                  key={household.id}
-                  variant="outline"
-                  disabled={switchingId !== null}
-                  className="h-11 justify-start rounded-2xl"
-                  onClick={async () => {
-                    setSwitchingId(household.id);
-                    await setActiveHousehold(household.id);
-                    router.push("/hemma");
-                    router.refresh();
-                  }}
-                >
-                  {switchingId === household.id && (
-                    <LoaderCircle aria-hidden="true" className="animate-spin" />
-                  )}
-                  Byt till {household.name}
-                </Button>
-              ))}
-          </div>
-        )}
-      </section>
-
-      <Button
-        variant="outline"
-        disabled={isSigningOut}
-        className="h-11 w-full rounded-2xl text-destructive"
-        onClick={async () => {
-          setIsSigningOut(true);
-          const { error } = await supabase.auth.signOut({ scope: "local" });
-          if (error) {
-            setIsSigningOut(false);
-            return;
-          }
-          router.replace("/logga-in");
-          router.refresh();
-        }}
-      >
-        {isSigningOut ? (
-          <LoaderCircle aria-hidden="true" className="animate-spin" />
-        ) : (
-          <LogOut aria-hidden="true" />
-        )}
-        {isSigningOut ? "Loggar ut…" : "Logga ut"}
-      </Button>
-    </div>
+        </div>
+        <Button type="submit" className="mt-3 min-h-11 w-full rounded-[18px]" disabled={isSaving || !hasChanges}>
+          {isSaving ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : isSaved ? <Check aria-hidden="true" /> : <Save aria-hidden="true" />}
+          {isSaving ? "Sparar…" : isSaved ? "Sparat" : "Spara namn"}
+        </Button>
+      </form>
+      <div className="flex min-h-16 items-center gap-3.5 px-5 py-4">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-[17px] bg-secondary text-primary">
+          <Mail aria-hidden="true" size={19} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-muted-foreground">E-post</p>
+          <p className="mt-0.5 truncate text-[0.9375rem] font-semibold">{email}</p>
+        </div>
+      </div>
+    </AppCard>
   );
 }

@@ -3,9 +3,10 @@ import {
   CookingPot,
   Refrigerator,
   Snowflake,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
-import type { InventoryLocation, InventoryStatus } from "@/types/database";
+import type { InventoryCategory, InventoryLocation, InventoryStatus } from "@/types/database";
 
 export const inventoryLocations: Array<{ label: string; value: InventoryLocation }> = [
   { label: "Kyl", value: "fridge" },
@@ -27,6 +28,22 @@ export const inventoryLocationIcons: Record<InventoryLocation, LucideIcon> = {
   pantry: Archive,
   spices: CookingPot,
 };
+
+export function getInventoryCategoryOptions(categories: InventoryCategory[]) {
+  const labels: Record<InventoryLocation, string> = { ...inventoryLocationLabels };
+  const icons: Record<InventoryLocation, LucideIcon> = { ...inventoryLocationIcons };
+
+  for (const category of categories) {
+    labels[category.key] = category.name;
+    icons[category.key] ??= Tags;
+  }
+
+  return {
+    labels,
+    icons,
+    locations: categories.map((category) => ({ label: category.name, value: category.key })),
+  };
+}
 
 export const inventoryStatuses: Array<{ label: string; value: InventoryStatus }> = [
   { label: "Full", value: "full" },

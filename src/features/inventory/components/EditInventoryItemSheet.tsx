@@ -19,6 +19,7 @@ import { updateInventoryItem } from "@/services/inventory.service";
 import { renameProduct } from "@/services/products.service";
 
 import { normalizeStoredUnit } from "@/lib/unitConversion";
+import { useInventoryCategories } from "@/hooks/useInventoryCategories";
 
 import type {
   InventoryItem,
@@ -30,7 +31,7 @@ import type {
 import InventoryUnitField from "./InventoryUnitField";
 
 import {
-  inventoryLocations,
+  getInventoryCategoryOptions,
   inventoryStatuses,
   inventoryUnits,
 } from "./inventoryFormOptions";
@@ -48,6 +49,8 @@ export default function EditInventoryItemSheet({
   onOpenChange,
   onItemChange,
 }: EditInventoryItemSheetProps) {
+  const { categories, selectableCategories } = useInventoryCategories([item.location]);
+  const { locations: inventoryLocations } = getInventoryCategoryOptions(selectableCategories.length > 0 ? selectableCategories : categories);
   const initialUnit = normalizeStoredUnit(
     item.unit || "st"
   );

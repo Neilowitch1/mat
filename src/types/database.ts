@@ -1,8 +1,16 @@
-export type InventoryLocation =
-  | "fridge"
-  | "freezer"
-  | "pantry"
-  | "spices";
+export type InventoryLocation = string;
+
+export interface InventoryCategory {
+  id: string;
+  household_id: string;
+  key: InventoryLocation;
+  name: string;
+  is_default: boolean;
+  is_enabled: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export type RecipeCategory = "cooking" | "baking";
 

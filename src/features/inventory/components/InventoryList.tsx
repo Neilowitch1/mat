@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, PackageOpen } from "lucide-react";
+import { Check, ChevronDown, PackageOpen, Tags } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import AppCard from "@/components/AppCard";
@@ -19,6 +19,7 @@ import {
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { useInventoryCategories } from "@/hooks/useInventoryCategories";
 
 import {
   classifyInventoryExpiration,
@@ -40,9 +41,7 @@ import AddInventorySheet from "./AddInventorySheet";
 import InventoryItemRow from "./InventoryItemRow";
 
 import {
-  inventoryLocationIcons,
-  inventoryLocationLabels,
-  inventoryLocations,
+  getInventoryCategoryOptions,
   inventoryStatuses,
 } from "./inventoryFormOptions";
 
@@ -443,6 +442,12 @@ function getProductGroupQuantityLabel(
 export default function InventoryList({
   initialInventoryItems,
 }: InventoryListProps) {
+  const { categories, selectableCategories } = useInventoryCategories();
+  const {
+    icons: inventoryLocationIcons,
+    labels: inventoryLocationLabels,
+    locations: inventoryLocations,
+  } = getInventoryCategoryOptions(selectableCategories.length > 0 ? selectableCategories : categories);
   const [inventoryItems, setInventoryItems] =
     useState(initialInventoryItems);
 
@@ -1037,7 +1042,7 @@ export default function InventoryList({
             </legend>
 
             <div className="rounded-[18px] bg-secondary p-0.5">
-              <div className="grid grid-cols-[repeat(5,minmax(0,1fr))_2.25rem] gap-0.5">
+              <div className="flex gap-0.5 overflow-x-auto">
               <Button
                 type="button"
                 variant="ghost"
@@ -1046,7 +1051,7 @@ export default function InventoryList({
                 onClick={() =>
                   setLocationFilter("all")
                 }
-                className={`h-9 rounded-[14px] px-1 text-[0.8rem] ${
+                className={`h-9 shrink-0 rounded-[14px] px-3 text-[0.8rem] ${
                   locationFilter === "all"
                     ? "bg-card text-primary shadow-sm hover:bg-card"
                     : "text-muted-foreground hover:bg-card/70"
@@ -1068,16 +1073,14 @@ export default function InventoryList({
                     onClick={() =>
                       setLocationFilter(location.value)
                     }
-                    className={`h-9 rounded-[14px] px-1 text-[0.8rem] ${
+                    className={`h-9 shrink-0 rounded-[14px] px-3 text-[0.8rem] ${
                       locationFilter === location.value
                         ? "bg-card text-primary shadow-sm hover:bg-card"
                         : "text-muted-foreground hover:bg-card/70"
                     }`}
                   >
                     {
-                      inventoryLocationLabels[
-                        location.value
-                      ]
+                      inventoryLocationLabels[location.value] ?? location.label
                     }
                   </Button>
                 );
@@ -1278,7 +1281,7 @@ export default function InventoryList({
                         const LocationIcon =
                           inventoryLocationIcons[
                             productGroup.location
-                          ];
+                          ] ?? Tags;
 
                         /*
                          * Flera batcher:
@@ -1308,9 +1311,7 @@ export default function InventoryList({
                                 />
 
                                 {
-                                  inventoryLocationLabels[
-                                    productGroup.location
-                                  ]
+                                  inventoryLocationLabels[productGroup.location] ?? productGroup.location
                                 }
                               </span>
                             </div>

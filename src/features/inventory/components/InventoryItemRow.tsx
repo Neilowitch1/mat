@@ -8,11 +8,13 @@ import {
   Pencil,
   Plus,
   ShoppingCart,
+  Tags,
   Trash2,
 } from "lucide-react";
 
 import AppCard from "@/components/AppCard";
 import { Button } from "@/components/ui/button";
+import { useInventoryCategories } from "@/hooks/useInventoryCategories";
 
 import {
   updateInventoryQuantity,
@@ -30,8 +32,7 @@ import InventoryExpirationControl from "./InventoryExpirationControl";
 import EditInventoryItemSheet from "./EditInventoryItemSheet";
 
 import {
-  inventoryLocationIcons,
-  inventoryLocationLabels,
+  getInventoryCategoryOptions,
   inventoryStatuses,
 } from "./inventoryFormOptions";
 
@@ -73,6 +74,8 @@ export default function InventoryItemRow({
   expanded = false,
   onToggleExpanded,
 }: InventoryItemRowProps) {
+  const { categories } = useInventoryCategories([item.location]);
+  const { icons: inventoryLocationIcons, labels: inventoryLocationLabels } = getInventoryCategoryOptions(categories);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [errorMessage, setErrorMessage] =
@@ -209,7 +212,7 @@ export default function InventoryItemRow({
   const LocationIcon =
     inventoryLocationIcons[
       item.location
-    ];
+    ] ?? Tags;
 
   const quantityControl = (
     <div className="flex shrink-0 items-center rounded-full border border-border bg-card p-0.5 shadow-[0_2px_8px_rgba(57,62,55,0.035)]">
@@ -537,9 +540,7 @@ if (embedded) {
           />
 
           {
-            inventoryLocationLabels[
-              item.location
-            ]
+            inventoryLocationLabels[item.location] ?? item.location
           }
         </span>
       </div>
