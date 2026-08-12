@@ -1,14 +1,17 @@
 import AppHeader from "@/components/AppHeader";
 import ShoppingList from "@/features/handla/components/ShoppingList";
-import { getShoppingList } from "@/services/shopping.service";
 import { ShoppingBasket } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { requireOnboardedUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
+import { getActiveHouseholdShoppingList } from "@/services/app-data.service";
+import { redirect } from "next/navigation";
 
 export default async function HandlaPage() {
-  const { activeHouseholdId } = await requireOnboardedUser();
+  const { userId } = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const shoppingItems = await getShoppingList(supabase, activeHouseholdId);
+  const { activeHouseholdId, shoppingList: shoppingItems } =
+    await getActiveHouseholdShoppingList(supabase, userId);
+  if (!activeHouseholdId) redirect("/onboarding");
 
   return (
     <>

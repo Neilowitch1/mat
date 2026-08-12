@@ -34,6 +34,7 @@ export default function BottomNavbar() {
           <Link
             key={href}
             href={href}
+            prefetch
             aria-label={label}
             aria-current={active ? "page" : undefined}
             className={`

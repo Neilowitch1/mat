@@ -21,6 +21,15 @@ export const getAuthState = cache(async () => {
   };
 });
 
+export const requireUser = cache(async () => {
+  const supabase = await createSupabaseServerClient();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+
+  if (!userId) redirect("/logga-in");
+  return { userId };
+});
+
 export async function requireOnboardedUser() {
   const state = await getAuthState();
   if (!state.userId) redirect("/logga-in");
