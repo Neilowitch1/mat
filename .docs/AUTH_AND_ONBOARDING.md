@@ -8,6 +8,7 @@
 - Authenticated users without `profiles.active_household_id` are redirected from `/hemma`, `/handla`, `/inventarie`, `/recept`, and their subroutes to `/onboarding`.
 - Anonymous users deliberately retain access to the fixed legacy household during verification. This is the temporary compatibility exception to the private-route guard.
 - Onboarding lists memberships, lets the user restore an existing active household, or calls `create_household()` to create one transactionally.
+- `create_household()` automatically moves any remaining fixed-household legacy rows into the first Auth user's newly created household. An advisory transaction lock makes the claim one-time under concurrent signups; later users can never claim the unowned legacy dataset.
 
 Do not apply `20260811102000_disable_legacy_anonymous_access.sql.example` yet. Invitations, owner transfer, and full household settings are not part of step 2.
 
