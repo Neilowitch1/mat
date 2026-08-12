@@ -101,7 +101,7 @@ export default function InventoryCategorySettings() {
       )}
 
       <form onSubmit={createCategory} className="flex gap-2">
-        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Till exempel Snacks" aria-label="Namn på ny kategori" maxLength={40} disabled={busy !== null} />
+        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Snacks" aria-label="Namn på ny kategori" maxLength={40} disabled={busy !== null} />
         <Button type="submit" className="min-h-11" disabled={busy !== null || !name.trim()}>
           {busy === "create" ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />}
           Lägg till
