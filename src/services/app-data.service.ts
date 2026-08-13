@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { InventoryItem, Recipe, ShoppingItem } from "@/types/database";
+import type {
+  InventoryCategory,
+  InventoryItem,
+  Recipe,
+  ShoppingItem,
+} from "@/types/database";
 
 type ActiveHousehold<T> = {
   active_household_id: string | null;
@@ -49,16 +54,29 @@ async function getProfileWithActiveHousehold<T>(
 export async function getActiveHouseholdInventory(
   client: SupabaseClient,
   userId: string,
-): Promise<{ activeHouseholdId: string | null; inventory: InventoryItem[] }> {
-  const profile = await getProfileWithActiveHousehold<{ inventory: InventoryItem[] }>(
-    client,
-    userId,
-    `inventory(${inventoryColumns})`,
-  );
+): Promise<{
+  activeHouseholdId: string | null;
+  inventory: InventoryItem[];
+  inventoryCategories: InventoryCategory[];
+}> {
+  const profile = await getProfileWithActiveHousehold<{
+    inventory: InventoryItem[];
+    inventory_categories: InventoryCategory[];
+  }>(client, userId, `
+    inventory(${inventoryColumns}),
+    inventory_categories(*)
+  `);
 
   return {
     activeHouseholdId: profile?.active_household_id ?? null,
     inventory: oldestFirst(profile?.active_household?.inventory ?? []),
+    inventoryCategories: [...(
+      profile?.active_household?.inventory_categories ?? []
+    )].sort(
+      (left, right) =>
+        left.sort_order - right.sort_order ||
+        left.created_at.localeCompare(right.created_at),
+    ),
   };
 }
 

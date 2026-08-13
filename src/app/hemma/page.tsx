@@ -9,14 +9,21 @@ import { redirect } from "next/navigation";
 export default async function HemmaPage() {
   const { userId } = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const { activeHouseholdId, inventory: inventoryItems } =
+  const {
+    activeHouseholdId,
+    inventory: inventoryItems,
+    inventoryCategories,
+  } =
     await getActiveHouseholdInventory(supabase, userId);
   if (!activeHouseholdId) redirect("/onboarding");
 
   return (
     <>
       <AppHeader title="Hemma" subtitle="Det här har du hemma" searchHref="/hemma?search=1" icon={HomeIcon} className="mb-4" />
-      <InventoryList initialInventoryItems={inventoryItems} />
+      <InventoryList
+        initialInventoryItems={inventoryItems}
+        initialInventoryCategories={inventoryCategories}
+      />
     </>
   );
 }

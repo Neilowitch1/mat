@@ -23,8 +23,17 @@ function loadInventoryCategories(): Promise<InventoryCategory[]> {
   return pendingCategoriesRequest;
 }
 
-export function useInventoryCategories(currentLocations: InventoryLocation[] = []) {
-  const [categories, setCategories] = useState<InventoryCategory[]>(defaultInventoryCategories);
+export function useInventoryCategories(
+  currentLocations: InventoryLocation[] = [],
+  initialCategories?: InventoryCategory[],
+) {
+  const hasInitialCategories = Boolean(initialCategories?.length);
+  const [categories, setCategories] = useState<InventoryCategory[]>(
+    () =>
+      initialCategories?.length
+        ? initialCategories
+        : defaultInventoryCategories,
+  );
 
   useEffect(() => {
     let isCurrent = true;
@@ -38,13 +47,15 @@ export function useInventoryCategories(currentLocations: InventoryLocation[] = [
       void load().catch(() => undefined);
     }
 
-    void load().catch(() => undefined);
+    if (!hasInitialCategories) {
+      void load().catch(() => undefined);
+    }
     window.addEventListener(inventoryCategoriesChangedEvent, reload);
     return () => {
       isCurrent = false;
       window.removeEventListener(inventoryCategoriesChangedEvent, reload);
     };
-  }, []);
+  }, [hasInitialCategories, initialCategories]);
 
   const categoriesByKey = useMemo(
     () => new Map(categories.map((category) => [category.key, category])),

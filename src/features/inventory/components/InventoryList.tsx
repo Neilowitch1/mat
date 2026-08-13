@@ -32,6 +32,7 @@ import {
 } from "@/services/inventory.service";
 
 import type {
+  InventoryCategory,
   InventoryItem,
   InventoryLocation,
   InventoryStatus,
@@ -47,6 +48,7 @@ import {
 
 interface InventoryListProps {
   initialInventoryItems: InventoryItem[];
+  initialInventoryCategories: InventoryCategory[];
 }
 
 type ProductInventoryGroup = {
@@ -73,6 +75,7 @@ type InventoryExpirationFilter = "expired" | "soon";
 
 const RESORT_DELAY_MS = 1500;
 const UPDATE_FEEDBACK_DURATION_MS = 2200;
+const MAX_VISIBLE_INVENTORY_CATEGORIES = 5;
 
 function getInventorySortSignature(item: InventoryItem): string {
   return [
@@ -441,13 +444,23 @@ function getProductGroupQuantityLabel(
 
 export default function InventoryList({
   initialInventoryItems,
+  initialInventoryCategories,
 }: InventoryListProps) {
-  const { categories, selectableCategories } = useInventoryCategories();
+  const { categories, selectableCategories } = useInventoryCategories(
+    [],
+    initialInventoryCategories,
+  );
   const {
     icons: inventoryLocationIcons,
     labels: inventoryLocationLabels,
     locations: inventoryLocations,
-  } = getInventoryCategoryOptions(selectableCategories.length > 0 ? selectableCategories : categories);
+  } = useMemo(
+    () =>
+      getInventoryCategoryOptions(
+        selectableCategories.length > 0 ? selectableCategories : categories,
+      ),
+    [categories, selectableCategories],
+  );
   const [inventoryItems, setInventoryItems] =
     useState(initialInventoryItems);
 
@@ -467,6 +480,21 @@ export default function InventoryList({
   const [expirationFilters, setExpirationFilters] = useState<
     InventoryExpirationFilter[]
   >([]);
+
+  const visibleInventoryLocations = useMemo(
+    () => inventoryLocations.slice(0, MAX_VISIBLE_INVENTORY_CATEGORIES),
+    [inventoryLocations],
+  );
+  const additionalInventoryLocations = useMemo(
+    () => inventoryLocations.slice(MAX_VISIBLE_INVENTORY_CATEGORIES),
+    [inventoryLocations],
+  );
+  const locationFilterGridStyle = useMemo(
+    () => ({
+      gridTemplateColumns: `repeat(${visibleInventoryLocations.length + 1}, minmax(0, 1fr)) 2.25rem`,
+    }),
+    [visibleInventoryLocations.length],
+  );
 
   const [isSearchOpen, setIsSearchOpen] =
     useState(false);
@@ -790,19 +818,20 @@ export default function InventoryList({
     }
   }
 
-  const filteredProductGroups = useMemo(() => {
+  const productGroups = useMemo(() => {
     const itemsForSorting = inventoryItems.map(
       (item) => sortingOverrides.get(item.id) ?? item
     );
 
-    const filteredItems =
-      locationFilter === "all"
-        ? itemsForSorting
-        : itemsForSorting.filter(
-            (item) => item.location === locationFilter
-          );
+    return groupItemsByProductAndLocation(itemsForSorting);
+  }, [inventoryItems, sortingOverrides]);
 
-    return groupItemsByProductAndLocation(filteredItems).filter((group) => {
+  const filteredProductGroups = useMemo(() => {
+    return productGroups.filter((group) => {
+      if (locationFilter !== "all" && group.location !== locationFilter) {
+        return false;
+      }
+
       if (
         statusFilter !== "all" &&
         getProductGroupStatus(group) !== statusFilter
@@ -822,9 +851,8 @@ export default function InventoryList({
     });
   }, [
     expirationFilters,
-    inventoryItems,
     locationFilter,
-    sortingOverrides,
+    productGroups,
     statusFilter,
   ]);
 
@@ -975,6 +1003,26 @@ export default function InventoryList({
     () => groupItemsByProductAndLocation(inventoryItems),
     [inventoryItems]
   );
+  const searchItems = useMemo(
+    () =>
+      searchProductGroups.map((group) => {
+        const firstItem = group.items[0];
+
+        return {
+          id: firstItem.id,
+          label: firstItem.product?.name ?? "Okänd produkt",
+          description:
+            group.items.length > 1
+              ? `${group.items.length} förpackningar · ${
+                  inventoryLocationLabels[group.location]
+                }`
+              : `${firstItem.quantity} ${firstItem.unit} · ${
+                  inventoryLocationLabels[group.location]
+                }`,
+        };
+      }),
+    [inventoryLocationLabels, searchProductGroups],
+  );
 
   return (
     <>
@@ -983,24 +1031,7 @@ export default function InventoryList({
         onOpenChange={setIsSearchOpen}
         title="Sök hemma"
         placeholder="Sök bland det du har hemma..."
-        items={searchProductGroups.map((group) => {
-          const firstItem = group.items[0];
-
-          return {
-            id: firstItem.id,
-            label:
-              firstItem.product?.name ??
-              "Okänd produkt",
-            description:
-              group.items.length > 1
-                ? `${group.items.length} förpackningar · ${
-                    inventoryLocationLabels[group.location]
-                  }`
-                : `${firstItem.quantity} ${firstItem.unit} · ${
-                    inventoryLocationLabels[group.location]
-                  }`,
-          };
-        })}
+        items={searchItems}
         onSelect={(item) =>
           focusInventoryItem(item.id)
         }
@@ -1042,73 +1073,72 @@ export default function InventoryList({
             </legend>
 
             <div className="rounded-[18px] bg-secondary p-0.5">
-              <div className="flex gap-0.5 overflow-x-auto">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-pressed={locationFilter === "all"}
-                onClick={() =>
-                  setLocationFilter("all")
-                }
-                className={`h-9 shrink-0 rounded-[14px] px-3 text-[0.8rem] ${
-                  locationFilter === "all"
-                    ? "bg-card text-primary shadow-sm hover:bg-card"
-                    : "text-muted-foreground hover:bg-card/70"
-                }`}
+              <div
+                className="grid min-w-0 items-center gap-0.5"
+                style={locationFilterGridStyle}
               >
-                Alla
-              </Button>
-
-              {inventoryLocations.map((location) => {
-                return (
-                  <Button
-                    key={location.value}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-pressed={
-                      locationFilter === location.value
-                    }
-                    onClick={() =>
-                      setLocationFilter(location.value)
-                    }
-                    className={`h-9 shrink-0 rounded-[14px] px-3 text-[0.8rem] ${
-                      locationFilter === location.value
-                        ? "bg-card text-primary shadow-sm hover:bg-card"
-                        : "text-muted-foreground hover:bg-card/70"
-                    }`}
-                  >
-                    {
-                      inventoryLocationLabels[location.value] ?? location.label
-                    }
-                  </Button>
-                );
-              })}
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-expanded={isFiltersOpen}
-                aria-controls="inventory-advanced-filters"
-                aria-label={isFiltersOpen ? "Stäng fler filter" : "Visa fler filter"}
-                onClick={() => setIsFiltersOpen((isOpen) => !isOpen)}
-                className="relative h-9 w-9 rounded-[14px] text-muted-foreground hover:bg-card/70"
-              >
-                <ChevronDown
-                  aria-hidden="true"
-                  className={`size-4 transition-transform duration-200 ${
-                    isFiltersOpen ? "rotate-180" : ""
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-pressed={locationFilter === "all"}
+                  onClick={() => setLocationFilter("all")}
+                  className={`h-9 min-w-0 w-full rounded-[14px] px-0.5 text-[0.8rem] sm:px-1.5 ${
+                    locationFilter === "all"
+                      ? "bg-card text-primary shadow-sm hover:bg-card"
+                      : "text-muted-foreground hover:bg-card/70"
                   }`}
-                />
-                {activeAdvancedFilterCount > 0 && (
-                  <span
+                >
+                  Alla
+                </Button>
+
+                {visibleInventoryLocations.map((location) => {
+                  return (
+                    <Button
+                      key={location.value}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-pressed={locationFilter === location.value}
+                      onClick={() => setLocationFilter(location.value)}
+                      className={`h-9 min-w-0 w-full rounded-[14px] px-0.5 text-[0.8rem] sm:px-1.5 ${
+                        locationFilter === location.value
+                          ? "bg-card text-primary shadow-sm hover:bg-card"
+                          : "text-muted-foreground hover:bg-card/70"
+                      }`}
+                    >
+                      <span className="min-w-0 truncate">
+                        {inventoryLocationLabels[location.value] ?? location.label}
+                      </span>
+                    </Button>
+                  );
+                })}
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-expanded={isFiltersOpen}
+                  aria-controls="inventory-advanced-filters"
+                  aria-label={
+                    isFiltersOpen ? "Stäng fler filter" : "Visa fler filter"
+                  }
+                  onClick={() => setIsFiltersOpen((isOpen) => !isOpen)}
+                  className="relative h-9 w-9 rounded-[14px] text-muted-foreground hover:bg-card/70"
+                >
+                  <ChevronDown
                     aria-hidden="true"
-                    className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary"
+                    className={`size-4 transition-transform duration-200 ${
+                      isFiltersOpen ? "rotate-180" : ""
+                    }`}
                   />
-                )}
-              </Button>
+                  {activeAdvancedFilterCount > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary"
+                    />
+                  )}
+                </Button>
               </div>
 
               <div
@@ -1121,7 +1151,37 @@ export default function InventoryList({
                 }`}
               >
                 <div className="overflow-hidden">
-                  <div className="mx-2 mb-2 mt-1 space-y-4 border-t border-border/60 px-1 pt-3">
+                  <div className="mx-0.5 mb-0.5 mt-1 space-y-3 rounded-[14px] bg-card/45 p-2.5">
+                    {additionalInventoryLocations.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-xs font-semibold text-foreground">
+                          Fler kategorier
+                        </p>
+                        <div className="flex min-w-0 flex-wrap gap-1.5">
+                          {additionalInventoryLocations.map((location) => (
+                            <Button
+                              key={location.value}
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              aria-pressed={locationFilter === location.value}
+                              onClick={() => setLocationFilter(location.value)}
+                              className={`h-8 max-w-full rounded-xl px-2.5 text-xs ${
+                                locationFilter === location.value
+                                  ? "bg-card text-primary shadow-sm hover:bg-card"
+                                  : "bg-secondary text-muted-foreground hover:bg-secondary/70"
+                              }`}
+                            >
+                              <span className="truncate">
+                                {inventoryLocationLabels[location.value] ??
+                                  location.label}
+                              </span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <p className="mb-2 text-xs font-semibold text-foreground">Status</p>
                       <div className="grid grid-cols-3 gap-1.5">
@@ -1251,7 +1311,7 @@ export default function InventoryList({
                               key={productGroup.key}
                               id={`inventory-item-${firstItem.id}`}
                               tabIndex={-1}
-                              className="scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                              className="scroll-mt-24 rounded-[24px] [contain-intrinsic-size:auto_7rem] [content-visibility:auto] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
                             >
                               <InventoryItemRow
                                 item={firstItem}
@@ -1290,7 +1350,7 @@ export default function InventoryList({
                         return (
                           <AppCard
                             key={productGroup.key}
-                            className="p-3.5"
+                            className="p-3.5 [contain-intrinsic-size:auto_9rem] [content-visibility:auto]"
                           >
                             <div className="mb-3 flex items-start justify-between gap-3">
                               <div className="min-w-0">
