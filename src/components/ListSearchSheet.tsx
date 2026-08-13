@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -47,11 +47,16 @@ export default function ListSearchSheet({
     [items, normalizedQuery]
   );
 
-  useEffect(() => {
-    if (!open) return;
-    const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [open]);
+  const setInputRef = useCallback(
+    (input: HTMLInputElement | null) => {
+      inputRef.current = input;
+
+      if (input && open) {
+        input.focus({ preventScroll: true });
+      }
+    },
+    [open]
+  );
 
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
@@ -74,7 +79,8 @@ export default function ListSearchSheet({
         <div className="relative">
           <Search aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
           <Input
-            ref={inputRef}
+            ref={setInputRef}
+            autoFocus={open}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}

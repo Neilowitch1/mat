@@ -26,6 +26,7 @@ import {
   isMergeableInventoryUnit,
   refillInventoryItem,
 } from "@/services/inventory.service";
+import { revalidateInventory } from "@/services/inventory.actions";
 
 import {
   formatConvertedQuantity,
@@ -277,12 +278,6 @@ export default function AddInventorySheet({
   const isMeasuredUnit =
     isMergeableInventoryUnit(
       normalizedUnit
-    );
-
-  const existingItemsAtLocation =
-    existingItems.filter(
-      (item) =>
-        item.location === location
     );
 
   const refillTarget =
@@ -629,6 +624,8 @@ export default function AddInventorySheet({
         inventoryItem =
           result.inventoryItem;
       }
+
+      await revalidateInventory();
 
       onInventoryItemAdded?.(
         inventoryItem
@@ -1035,62 +1032,33 @@ export default function AddInventorySheet({
 
           {/* NY BATCH / FÖRPACKNING */}
           {showBatchPreview && (
-            <div className="mt-4 rounded-[20px] border border-border bg-secondary/60 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-card text-primary shadow-sm">
+            <div className="mt-4 rounded-[20px] border border-border bg-secondary/60 p-4">
+              <div className="flex items-start gap-3.5">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-card text-primary shadow-sm">
                   <PackagePlus
                     aria-hidden="true"
-                    size={18}
+                    size={22}
                   />
                 </div>
 
                 <div className="min-w-0">
-                  <p className="font-semibold text-foreground">
-                    Läggs till som ny
-                    förpackning
+                  <p className="font-semibold leading-6 text-foreground">
+                    Den här varan finns redan hemma
                   </p>
 
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                    Den nya varan
-                    sparas separat
-                    i den existerande varan som redan
-                    finns hemma.
+                  <p className="mt-1.5 text-sm leading-5 text-muted-foreground">
+                    Den läggs till som en ny förpackning, så att du kan ha olika mängd, status och bäst före-datum.
                   </p>
-
-                  {existingItemsAtLocation.length >
-                    0 && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Du har redan{" "}
-                      {
-                        existingItemsAtLocation.length
-                      }{" "}
-                      {existingItemsAtLocation.length ===
-                      1
-                        ? "post"
-                        : "poster"}{" "}
-                      av{" "}
-                      {
-                        preselectedProduct?.name
-                      }{" "}
-                      i{" "}
-                      {inventoryLocationLabels[
-                        location
-                      ].toLocaleLowerCase(
-                        "sv"
-                      )}
-                      .
-                    </p>
-                  )}
                 </div>
               </div>
 
-              <dl className="mt-3 border-t border-border pt-3 text-sm">
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-xs text-muted-foreground">
-                    Ny förpackning
+              <dl className="mt-4 border-t border-border pt-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <dt className="font-semibold text-foreground">
+                    Skapas som:
                   </dt>
 
-                  <dd className="text-right font-semibold text-primary">
+                  <dd className="rounded-full border border-primary/10 bg-card px-2.5 py-1 font-semibold text-primary shadow-sm">
                     {Number.isFinite(
                       parsedPreviewQuantity
                     ) &&
