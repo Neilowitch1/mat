@@ -5,10 +5,31 @@ import { cn } from "@/lib/utils";
 
 interface BrandMarkProps {
   className?: string;
+  imageClassName?: string;
   showName?: boolean;
+  variant?: "mark" | "auth";
 }
 
-export default function BrandMark({ className, showName = true }: BrandMarkProps) {
+export default function BrandMark({
+  className,
+  imageClassName,
+  showName = true,
+  variant = "mark",
+}: BrandMarkProps) {
+  if (variant === "auth") {
+    return (
+      <Image
+        src="/brand/logo/logo-mark-transparent.png"
+        alt={`${brand.name} logotyp`}
+        width={945}
+        height={620}
+        sizes="(min-width: 640px) 210px, 190px"
+        className={cn("h-auto w-full", imageClassName, className)}
+        priority
+      />
+    );
+  }
+
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <Image
