@@ -61,6 +61,13 @@ export async function leaveHousehold(householdId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function deleteHouseholdAsLastMember(householdId: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_household_as_last_member", {
+    target_household_id: householdId,
+  });
+  if (error) throw error;
+}
+
 export async function transferHouseholdOwnership(householdId: string, userId: string): Promise<void> {
   const { error } = await supabase.rpc("transfer_household_ownership", { target_household_id: householdId, target_user_id: userId });
   if (error) throw error;

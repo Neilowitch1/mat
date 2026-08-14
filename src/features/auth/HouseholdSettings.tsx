@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { supabase } from "@/lib/supabase";
 import { getProfileDisplayName } from "@/lib/profile";
-import { acceptHouseholdInvitation, createJoinCode, demoteHouseholdOwner, getHouseholdMembers, getHouseholds, leaveHousehold, removeHouseholdMember, setActiveHousehold, transferHouseholdOwnership, type HouseholdWithMembership } from "@/services/households.service";
+import { acceptHouseholdInvitation, createJoinCode, deleteHouseholdAsLastMember, demoteHouseholdOwner, getHouseholdMembers, getHouseholds, leaveHousehold, removeHouseholdMember, setActiveHousehold, transferHouseholdOwnership, type HouseholdWithMembership } from "@/services/households.service";
 import type { HouseholdMemberDetails } from "@/types/database";
 
 export default function HouseholdSettings() {
@@ -24,7 +24,8 @@ export default function HouseholdSettings() {
   const [joinInput, setJoinInput] = useState("");
   const [joinCode, setJoinCode] = useState<{ code: string; expires_at: string } | null>(null);
   const [busy, setBusy] = useState<string | null>("load");
-  const [pendingAction, setPendingAction] = useState<{ kind: "remove" | "leave" | "demote"; member?: HouseholdMemberDetails } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ kind: "remove" | "leave" | "delete" | "demote"; member?: HouseholdMemberDetails } | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -63,11 +64,19 @@ export default function HouseholdSettings() {
   const me = members.find((member) => member.user_id === userId);
   const isOwner = me?.role === "owner";
   const ownerCount = members.filter((member) => member.role === "owner").length;
+  const isOnlyMember = members.length === 1;
 
   async function run(key: string, action: () => Promise<void>) {
     setBusy(key);
     try { await action(); await load(); }
-    catch (error) { toast.error(error instanceof Error ? error.message : "Något gick fel"); }
+    catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+          ? error.message
+          : "Något gick fel";
+      toast.error(message);
+    }
     finally { setBusy(null); }
   }
 
@@ -92,6 +101,9 @@ export default function HouseholdSettings() {
     setPendingAction(null);
     if (action.kind === "leave") {
       await run("leave", async () => { await leaveHousehold(householdId); router.replace("/onboarding"); router.refresh(); });
+    } else if (action.kind === "delete") {
+      if (deleteConfirmation !== "RADERA") return;
+      await run("delete", async () => { await deleteHouseholdAsLastMember(householdId); router.replace("/onboarding"); router.refresh(); });
     } else if (action.kind === "remove" && action.member) {
       await run(`remove-${action.member.user_id}`, async () => { await removeHouseholdMember(householdId, action.member!.user_id); toast.success("Medlemmen är borttagen"); });
     } else if (action.kind === "demote" && action.member) {
@@ -122,8 +134,8 @@ export default function HouseholdSettings() {
     {isOwner && <AppCard className="space-y-5"><section><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-foreground"><MailPlus aria-hidden="true" size={18}/></span><div><h3 className="text-sm font-semibold">Bjud in medlem</h3><p className="mt-0.5 text-xs leading-5 text-muted-foreground">Vi skickar en personlig, säker länk som gäller i sju dagar.</p></div></div><form onSubmit={invite} className="mt-4 flex gap-2"><Input type="email" aria-label="E-postadress till ny medlem" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="namn@exempel.se" required/><Button type="submit" className="min-h-11" disabled={busy !== null || !email.trim()}>{busy === "email" && <LoaderCircle className="animate-spin"/>}Bjud in</Button></form></section><div className="border-t border-border"/><section><h3 className="text-sm font-semibold">Anslutningskod</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Engångsbar och giltig i fem minuter.</p>{joinCode && <div className="mt-3 rounded-[18px] bg-accent px-4 py-3 text-center"><p className="font-mono text-2xl font-bold tracking-[0.18em]">{joinCode.code}</p><p className="mt-1 text-xs text-muted-foreground">Giltig till {new Date(joinCode.expires_at).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</p></div>}<Button variant="outline" className="mt-3 min-h-11 w-full rounded-[18px]" disabled={busy !== null} onClick={() => void run("code", async () => setJoinCode(await createJoinCode(householdId)))}>{busy === "code" ? <LoaderCircle className="animate-spin"/> : <RefreshCw/>}{joinCode ? "Förnya kod" : "Skapa kod"}</Button></section></AppCard>}
 
     <AppCard><h3 className="text-sm font-semibold">Gå med via kod</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Skriv koden du fått av hushållets ägare.</p><form onSubmit={join} className="mt-3 flex gap-2"><Input aria-label="Anslutningskod" value={joinInput} onChange={(event) => setJoinInput(event.target.value.toUpperCase().replace(/[^A-F0-9]/g, "").slice(0, 8))} className="font-mono uppercase tracking-widest" placeholder="XXXXXXXX" minLength={8} maxLength={8} required/><Button type="submit" className="min-h-11" disabled={busy !== null || joinInput.length !== 8}>{busy === "join" ? <LoaderCircle className="animate-spin"/> : "Anslut"}</Button></form></AppCard>
-    <Button variant="outline" className="min-h-12 w-full rounded-[18px] text-destructive" disabled={busy !== null || (isOwner && ownerCount <= 1)} title={isOwner && ownerCount <= 1 ? "Gör först en annan medlem till ägare" : undefined} onClick={() => setPendingAction({ kind: "leave" })}>{busy === "leave" && <LoaderCircle className="animate-spin"/>}Lämna hushållet</Button>
-    {isOwner && ownerCount <= 1 && <p className="px-2 text-center text-xs text-muted-foreground">Du är sista ägaren. Gör en annan medlem till ägare innan du lämnar.</p>}
-    <Sheet open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null); }}><SheetContent side="bottom"><SheetHeader><SheetTitle>{pendingAction?.kind === "remove" ? "Ta bort medlem?" : pendingAction?.kind === "demote" ? "Ändra till medlem?" : "Lämna hushållet?"}</SheetTitle><SheetDescription>{pendingAction?.kind === "remove" ? `${getProfileDisplayName(pendingAction.member?.display_name, pendingAction.member?.email)} förlorar åtkomst till ${householdName} och hushållets data.` : pendingAction?.kind === "demote" ? `${getProfileDisplayName(pendingAction.member?.display_name, pendingAction.member?.email)} kan inte längre bjuda in eller hantera medlemmar. Personen är kvar i hushållet.` : `Du förlorar åtkomst till ${householdName} och dess data. En ägare kan bjuda in dig igen senare.`}</SheetDescription></SheetHeader><SheetFooter><Button variant="destructive" disabled={busy !== null} onClick={() => void confirmPendingAction()}>{pendingAction?.kind === "remove" ? "Ta bort medlem" : pendingAction?.kind === "demote" ? "Ändra till medlem" : "Lämna hushållet"}</Button><Button variant="outline" onClick={() => setPendingAction(null)}>Avbryt</Button></SheetFooter></SheetContent></Sheet>
+    <Button variant="outline" className="min-h-12 w-full rounded-[18px] text-destructive" disabled={busy !== null || (isOwner && !isOnlyMember && ownerCount <= 1)} title={isOwner && !isOnlyMember && ownerCount <= 1 ? "Gör först en annan medlem till ägare" : undefined} onClick={() => { setDeleteConfirmation(""); setPendingAction({ kind: isOnlyMember ? "delete" : "leave" }); }}>{busy === "leave" || busy === "delete" ? <LoaderCircle className="animate-spin"/> : null}{isOnlyMember ? "Radera hushållet" : "Lämna hushållet"}</Button>
+    {isOwner && !isOnlyMember && ownerCount <= 1 && <p className="px-2 text-center text-xs text-muted-foreground">Du är sista ägaren. Gör en annan medlem till ägare innan du lämnar.</p>}
+    <Sheet open={pendingAction !== null} onOpenChange={(open) => { if (!open) { setPendingAction(null); setDeleteConfirmation(""); } }}><SheetContent side="bottom" className="mx-auto max-w-md px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"><SheetHeader className="px-0 pt-4"><SheetTitle>{pendingAction?.kind === "remove" ? "Ta bort medlem?" : pendingAction?.kind === "demote" ? "Ändra till medlem?" : pendingAction?.kind === "delete" ? "Radera hushållet permanent?" : "Lämna hushållet?"}</SheetTitle><SheetDescription className="leading-6">{pendingAction?.kind === "remove" ? `${getProfileDisplayName(pendingAction.member?.display_name, pendingAction.member?.email)} förlorar åtkomst till ${householdName} och hushållets data.` : pendingAction?.kind === "demote" ? `${getProfileDisplayName(pendingAction.member?.display_name, pendingAction.member?.email)} kan inte längre bjuda in eller hantera medlemmar. Personen är kvar i hushållet.` : pendingAction?.kind === "delete" ? `Du är den sista medlemmen i ${householdName}. Inventarie, inköpslista, recept med ingredienser, inbjudningar och anslutningskoder samt hushållsspecifika inställningar raderas permanent. Det går inte att ångra. Den globala produktkatalogen påverkas inte.` : `Du förlorar åtkomst till ${householdName} och dess data. En ägare kan bjuda in dig igen senare.`}</SheetDescription></SheetHeader>{pendingAction?.kind === "delete" && <div className="space-y-2"><label htmlFor="delete-household-confirmation" className="text-sm font-semibold">Skriv RADERA för att bekräfta</label><Input id="delete-household-confirmation" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" spellCheck={false} aria-describedby="delete-household-help"/><p id="delete-household-help" className="text-xs text-muted-foreground">Bekräftelsen måste skrivas exakt med stora bokstäver.</p></div>}<SheetFooter className="px-0 pb-0"><Button variant="destructive" disabled={busy !== null || (pendingAction?.kind === "delete" && deleteConfirmation !== "RADERA")} onClick={() => void confirmPendingAction()}>{pendingAction?.kind === "remove" ? "Ta bort medlem" : pendingAction?.kind === "demote" ? "Ändra till medlem" : pendingAction?.kind === "delete" ? "Radera hushållet permanent" : "Lämna hushållet"}</Button><Button variant="outline" onClick={() => { setPendingAction(null); setDeleteConfirmation(""); }}>Avbryt</Button></SheetFooter></SheetContent></Sheet>
   </section>;
 }

@@ -99,9 +99,44 @@ If onboarding already created another household, the SQL above safely changes th
 
 ## Remaining backlog
 
-- Account and household deletion flows.
+- Account deletion flow.
 - Product-catalog write hardening.
 - Final anonymous-policy cutover after production verification.
+
+## Last-member household deletion
+
+`20260814100000_delete_household_as_last_member.sql` adds the protected
+`delete_household_as_last_member` RPC. Apply it manually in Supabase after all
+earlier repository migrations:
+
+1. Take a database backup or point-in-time recovery checkpoint.
+2. Open Supabase Dashboard → SQL Editor.
+3. Copy the complete contents of
+   `supabase/migrations/20260814100000_delete_household_as_last_member.sql` into
+   a new query and run it once.
+4. Confirm that the query commits successfully and that the function is
+   executable only by the `authenticated` role.
+5. Test first with a disposable household whose only member is its owner.
+
+The RPC locks the household row, rechecks that the caller is its sole member and
+owner, clears the active-household pointer, and deletes the household in one
+transaction. Cascading foreign keys remove inventory, shopping-list rows,
+recipes and ingredients, invitations and join codes, memberships, and inventory
+categories. The global `products` catalog is not connected to this cascade and
+is never deleted.
+
+If `20260814100000_delete_household_as_last_member.sql` has already been
+applied, also apply
+`20260814210000_fix_delete_household_profile_references.sql`. The corrective
+migration clears every stale profile pointer to the household before deletion;
+it does not weaken the sole-member or owner checks.
+
+After that migration, apply
+`20260814220000_fix_delete_household_owner_role_check.sql`. It renames the
+PL/pgSQL membership-role variable so PostgreSQL cannot interpret `current_role`
+as its built-in database-role keyword during the owner check. All authentication,
+locking, sole-member, profile cleanup, privilege, and search-path protections
+remain unchanged.
 
 ## Production polish: guards, roles, and invitation delivery
 
