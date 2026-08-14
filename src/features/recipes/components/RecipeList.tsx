@@ -79,6 +79,14 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
     setRecipes((currentRecipes) => [recipe, ...currentRecipes]);
   }
 
+  function focusRecipe(id: string) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const recipe = document.getElementById(`recipe-${id}`);
+      recipe?.scrollIntoView({ behavior: "smooth", block: "center" });
+      recipe?.focus({ preventScroll: true });
+    }));
+  }
+
   return (
     <>
       <ListSearchSheet
@@ -99,7 +107,7 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
             .filter((value): value is string => value !== null)
             .join(" • "),
         }))}
-        onSelect={(item) => router.push(`/recept/${item.id}`)}
+        onSelect={(item) => focusRecipe(item.id)}
       />
 
       <div className="mb-4 grid grid-cols-3 gap-0.5 rounded-[18px] bg-secondary p-0.5" role="tablist" aria-label="Receptvy">
@@ -185,7 +193,7 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
               const availability = availabilityByRecipeId.get(recipe.id);
 
               return (
-              <Link key={recipe.id} href={`/recept/${recipe.id}`} className="block rounded-[24px] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/20">
+              <Link id={`recipe-${recipe.id}`} key={recipe.id} href={`/recept/${recipe.id}`} className="block scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-primary/20">
                 <AppCard className="p-4 transition-colors hover:bg-secondary/30">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

@@ -43,6 +43,8 @@ interface InventoryItemRowProps {
   deleteDisabled: boolean;
   deleteErrorMessage?: string;
   updateFeedbackMessage?: string;
+  isInShoppingList: boolean;
+  onShoppingProductAdded: (productId: string) => void;
   embedded?: boolean;
 
   expanded?: boolean;
@@ -51,9 +53,7 @@ interface InventoryItemRowProps {
 
 type ShoppingActionState =
   | "idle"
-  | "loading"
-  | "added"
-  | "already-exists";
+  | "loading";
 
 function getStatusLabel(status: InventoryStatus): string {
   return (
@@ -70,6 +70,8 @@ export default function InventoryItemRow({
   deleteDisabled,
   deleteErrorMessage,
   updateFeedbackMessage,
+  isInShoppingList,
+  onShoppingProductAdded,
   embedded = false,
   expanded = false,
   onToggleExpanded,
@@ -182,16 +184,9 @@ export default function InventoryItemRow({
     setErrorMessage(null);
 
     try {
-      const { alreadyExists } =
-        await addToShoppingList(
-          item.product_id
-        );
-
-      setShoppingActionState(
-        alreadyExists
-          ? "already-exists"
-          : "added"
-      );
+      await addToShoppingList(item.product_id);
+      onShoppingProductAdded(item.product_id);
+      setShoppingActionState("idle");
     } catch {
       setShoppingActionState("idle");
 
@@ -204,9 +199,6 @@ export default function InventoryItemRow({
   const shoppingActionLabel = {
     idle: "Lägg till i inköpslistan",
     loading: "Lägger till...",
-    added: "Tillagd i inköpslistan",
-    "already-exists":
-      "Finns redan i inköpslistan",
   }[shoppingActionState];
 
   const LocationIcon =
@@ -379,18 +371,14 @@ export default function InventoryItemRow({
         variant="outline"
         size="sm"
         disabled={
-          shoppingActionState !==
-          "idle"
+          isInShoppingList || shoppingActionState !== "idle"
         }
         onClick={
           handleAddToShoppingList
         }
         className="mt-1.5 h-8 rounded-full border-border bg-transparent px-3 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
       >
-        {shoppingActionState ===
-          "added" ||
-        shoppingActionState ===
-          "already-exists" ? (
+        {isInShoppingList ? (
           <Check
             aria-hidden="true"
           />
@@ -400,7 +388,9 @@ export default function InventoryItemRow({
           />
         )}
 
-        {shoppingActionLabel}
+        {isInShoppingList
+          ? "Finns i inköpslistan"
+          : shoppingActionLabel}
       </Button>
     ) : null;
 
@@ -442,7 +432,6 @@ export default function InventoryItemRow({
       open={isEditOpen}
       onOpenChange={setIsEditOpen}
       onItemChange={(updatedItem) => {
-        setShoppingActionState("idle");
         onItemChange(updatedItem);
       }}
     />

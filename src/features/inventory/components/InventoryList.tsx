@@ -30,6 +30,7 @@ import {
   getInventoryItem,
   removeInventoryItem,
 } from "@/services/inventory.service";
+import { getShoppingList } from "@/services/shopping.service";
 
 import type {
   InventoryCategory,
@@ -49,6 +50,7 @@ import {
 interface InventoryListProps {
   initialInventoryItems: InventoryItem[];
   initialInventoryCategories: InventoryCategory[];
+  initialShoppingProductIds: string[];
 }
 
 type ProductInventoryGroup = {
@@ -73,7 +75,7 @@ type InventorySort =
 
 type InventoryExpirationFilter = "expired" | "soon";
 
-const RESORT_DELAY_MS = 1500;
+const RESORT_DELAY_MS = 3000;
 const UPDATE_FEEDBACK_DURATION_MS = 2200;
 const MAX_VISIBLE_INVENTORY_CATEGORIES = 5;
 
@@ -445,6 +447,7 @@ function getProductGroupQuantityLabel(
 export default function InventoryList({
   initialInventoryItems,
   initialInventoryCategories,
+  initialShoppingProductIds,
 }: InventoryListProps) {
   const { categories, selectableCategories } = useInventoryCategories(
     [],
@@ -463,6 +466,10 @@ export default function InventoryList({
   );
   const [inventoryItems, setInventoryItems] =
     useState(initialInventoryItems);
+
+  const [shoppingProductIds, setShoppingProductIds] = useState(
+    () => new Set(initialShoppingProductIds)
+  );
 
   const [locationFilter, setLocationFilter] = useState<
     InventoryLocation | "all"
@@ -585,7 +592,7 @@ export default function InventoryList({
     setStatusFilter("all");
     setExpirationFilters([]);
 
-    requestAnimationFrame(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const row = document.getElementById(
         `inventory-item-${id}`
       );
@@ -598,7 +605,7 @@ export default function InventoryList({
       row?.focus({
         preventScroll: true,
       });
-    });
+    }));
   }
 
   useRealtimeTable("inventory", async (change) => {
@@ -659,6 +666,25 @@ export default function InventoryList({
       return;
     }
   });
+
+  useRealtimeTable("shopping_list", async () => {
+    try {
+      const shoppingItems = await getShoppingList();
+      setShoppingProductIds(
+        new Set(shoppingItems.map((item) => item.product_id))
+      );
+    } catch {
+      return;
+    }
+  });
+
+  function handleShoppingProductAdded(productId: string) {
+    setShoppingProductIds((currentProductIds) => {
+      const nextProductIds = new Set(currentProductIds);
+      nextProductIds.add(productId);
+      return nextProductIds;
+    });
+  }
 
   function handleInventoryItemChange(
     updatedItem: InventoryItem
@@ -1315,6 +1341,10 @@ export default function InventoryList({
                             >
                               <InventoryItemRow
                                 item={firstItem}
+                                isInShoppingList={shoppingProductIds.has(
+                                  firstItem.product_id
+                                )}
+                                onShoppingProductAdded={handleShoppingProductAdded}
                                 updateFeedbackMessage={
                                   updateFeedback.get(firstItem.id)
                                 }
@@ -1394,6 +1424,10 @@ export default function InventoryList({
                                         )
                                       }
                                       item={item}
+                                      isInShoppingList={shoppingProductIds.has(
+                                        item.product_id
+                                      )}
+                                      onShoppingProductAdded={handleShoppingProductAdded}
                                       updateFeedbackMessage={
                                         updateFeedback.get(item.id)
                                       }

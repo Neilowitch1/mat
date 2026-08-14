@@ -65,7 +65,7 @@ export default function ListSearchSheet({
 
   function handleSelect(item: ListSearchItem) {
     handleOpenChange(false);
-    window.requestAnimationFrame(() => onSelect(item));
+    window.setTimeout(() => onSelect(item), 200);
   }
 
   return (

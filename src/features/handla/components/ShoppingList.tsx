@@ -111,18 +111,20 @@ export default function ShoppingList({
   }, [router, searchParams]);
 
   function focusShoppingItem(id: string) {
-    const row = document.getElementById(
-      `shopping-item-${id}`
-    );
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const row = document.getElementById(
+        `shopping-item-${id}`
+      );
 
-    row?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
+      row?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
 
-    row?.focus({
-      preventScroll: true,
-    });
+      row?.focus({
+        preventScroll: true,
+      });
+    }));
   }
 
   useRealtimeTable(
