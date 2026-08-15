@@ -18,6 +18,7 @@ import {
 } from "react";
 
 import AppCard from "@/components/AppCard";
+import ScrollToTopButton from "@/components/ScrollToTopButton";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -817,6 +818,8 @@ function confirmPendingNavigation() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <ScrollToTopButton />
     </>
   );
 }

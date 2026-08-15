@@ -3,13 +3,13 @@ import {
   ChevronRight,
   KeyRound,
   Settings,
-  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 
 import AppCard from "@/components/AppCard";
 import AppHeader from "@/components/AppHeader";
 import AccountCard from "@/features/auth/AccountCard";
+import DeleteAccount from "@/features/auth/DeleteAccount";
 import HouseholdSettings from "@/features/auth/HouseholdSettings";
 import InventoryCategorySettings from "@/features/auth/InventoryCategorySettings";
 import SignOutButton from "@/features/auth/SignOutButton";
@@ -95,16 +95,7 @@ export default async function InstallningarPage() {
               </div>
               <ChevronRight aria-hidden="true" size={18} className="shrink-0 text-muted-foreground" />
             </Link>
-            <div className="flex min-h-16 items-center gap-3.5 px-4 py-3.5" aria-disabled="true">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-[17px] bg-destructive/10 text-destructive">
-                <Trash2 aria-hidden="true" size={19} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Radera konto</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Ta bort konto och personuppgifter</p>
-              </div>
-              <SoonBadge />
-            </div>
+            <DeleteAccount />
           </AppCard>
         </section>
 

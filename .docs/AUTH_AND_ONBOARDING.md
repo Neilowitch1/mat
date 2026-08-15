@@ -99,7 +99,6 @@ If onboarding already created another household, the SQL above safely changes th
 
 ## Remaining backlog
 
-- Account deletion flow.
 - Product-catalog write hardening.
 - Final anonymous-policy cutover after production verification.
 
@@ -171,3 +170,17 @@ Household invitation emails are sent by Kökshyllan through Resend. Supabase's o
 - Reauthentication (when enabled)
 
 Keep Supabase's required template variables and confirmation URL intact when styling them. Supabase SMTP/provider configuration is independent of `RESEND_API_KEY` used by Kökshyllan's household invitation route.
+
+## Safe account deletion
+
+Apply `20260814230000_safe_account_deletion.sql` after the household-deletion migrations. It installs a protected `before delete` trigger on `auth.users`. The trigger locks every affected household and performs all ownership checks inside the same transaction as Supabase Auth's user deletion:
+
+- A sole owner/member's household is deleted through the existing household cascade, including inventory, shopping rows, recipes, ingredients, invitations, join codes and categories.
+- A regular member, or an owner where another owner remains, is removed from each household.
+- Deletion is rejected when the user is the final owner of a household that still has other members.
+- Profile data and invitations created by the user follow their existing `auth.users` cascading foreign keys.
+- The global `products` table is not connected to the household cascade and is never deleted.
+
+The app route authenticates the cookie-backed user and calls Supabase Auth Admin `deleteUser` for that exact user ID. Configure `SUPABASE_SERVICE_ROLE_KEY` in local `.env.local` and Vercel. This credential is server-only: never expose it to client components, never prefix it with `NEXT_PUBLIC_`, and never commit its value. Redeploy after adding it.
+
+Manual verification should cover: a sole-member household, a regular member in a shared household, a co-owner when another owner remains, a blocked final owner with other members, a user with multiple memberships, retained global products, removed household-owned rows, cleared auth/session cookies, and redirect to `/logga-in`.
