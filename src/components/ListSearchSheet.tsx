@@ -35,8 +35,8 @@ export default function ListSearchSheet({
   onSelect,
 }: ListSearchSheetProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectionInProgressRef = useRef(false);
   const [query, setQuery] = useState("");
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const [mobileViewport, setMobileViewport] = useState<{
     height: number;
     offsetTop: number;
@@ -64,7 +64,13 @@ export default function ListSearchSheet({
   );
 
   useEffect(() => {
-    if (!open || !isInputFocused) {
+    if (open) {
+      selectionInProgressRef.current = false;
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
       return;
     }
 
@@ -94,17 +100,22 @@ export default function ListSearchSheet({
       window.removeEventListener("resize", updateViewport);
       mediaQuery.removeEventListener("change", updateViewport);
     };
-  }, [isInputFocused, open]);
+  }, [open]);
 
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
     if (!nextOpen) {
       setQuery("");
-      setIsInputFocused(false);
+      setMobileViewport(null);
     }
   }
 
   function handleSelect(item: ListSearchItem) {
+    if (selectionInProgressRef.current) {
+      return;
+    }
+
+    selectionInProgressRef.current = true;
     handleOpenChange(false);
     onSelect(item);
   }
@@ -113,11 +124,24 @@ export default function ListSearchSheet({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
+        onPointerDown={(event) => {
+          if (
+            event.isPrimary &&
+            event.button === 0 &&
+            event.pointerType !== "mouse" &&
+            !(event.target as HTMLElement).closest(
+              "button, input, a, [role='button'], [tabindex]"
+            )
+          ) {
+            event.preventDefault();
+          }
+        }}
         style={
           mobileViewport
             ? {
                 top: `calc(${mobileViewport.offsetTop}px + env(safe-area-inset-top) + 0.75rem)`,
                 bottom: "auto",
+                minHeight: `min(20rem, calc(${mobileViewport.height}px - env(safe-area-inset-top) - 1.5rem))`,
                 maxHeight: `calc(${mobileViewport.height}px - env(safe-area-inset-top) - 1.5rem)`,
               }
             : undefined
@@ -137,11 +161,6 @@ export default function ListSearchSheet({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => {
-              setIsInputFocused(false);
-              setMobileViewport(null);
-            }}
             placeholder={placeholder}
             aria-label={placeholder}
             autoComplete="off"
@@ -156,6 +175,16 @@ export default function ListSearchSheet({
                 <li key={item.id}>
                   <button
                     type="button"
+                    onPointerDown={(event) => {
+                      if (
+                        event.isPrimary &&
+                        event.button === 0 &&
+                        event.pointerType !== "mouse"
+                      ) {
+                        event.preventDefault();
+                        handleSelect(item);
+                      }
+                    }}
                     onClick={() => handleSelect(item)}
                     className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-2 py-3 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
                   >
