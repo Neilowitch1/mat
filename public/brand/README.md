@@ -5,6 +5,7 @@ Godkända masterfiler finns i `Brand/Logo/` och ska inte ändras eller skrivas �
 
 ## Logotyper
 
+- `email-logo.png` används i auth- och systemmejl och är en oförändrad runtime-kopia av `Brand/Logo/logo-full-stacked-landscape-no-tagline.png`.
 - `logo/logo-no-tagline-transparent.png` används av auth-varianten i `BrandMark`, bland annat via `AuthShell`.
   Runtime-filen är en oförändrad kopia av `Brand/Logo/logo-no-tagline-transparent.png`.
 - `logo/logo-mark.png` används av standardvarianten i `BrandMark`.
