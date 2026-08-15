@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getAuthErrorMessage } from "@/lib/auth-error";
 import { supabase } from "@/lib/supabase";
 
 type Mode = "login" | "signup" | "forgot" | "reset";
@@ -32,7 +33,7 @@ export default function AuthForm({ mode, nextPath }: { mode: Mode; nextPath?: st
         if (!completionResponse.ok) throw new Error("Lösenordet ändrades, men sessionen kunde inte avslutas. Logga ut manuellt.");
         toast.success("Lösenordet är uppdaterat. Logga in igen."); router.replace("/logga-in");
       }
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Något gick fel"); } finally { setLoading(false); }
+    } catch (error) { toast.error(getAuthErrorMessage(error)); } finally { setLoading(false); }
   }
   if (sent) return <p className="text-sm leading-6">Kontrollera din e-post och följ länken för att fortsätta.</p>;
   const loadingLabel = mode === "login" ? "Loggar in…" : mode === "signup" ? "Skapar konto…" : mode === "forgot" ? "Skickar länk…" : "Sparar lösenord…";
