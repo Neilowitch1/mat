@@ -12,7 +12,7 @@ interface Props {
 
 export default function AppLayout({ children }: Props) {
   const pathname = usePathname();
-  const isFocusedFlow = ["/logga-in", "/skapa-konto", "/glomt-losenord", "/aterstall-losenord", "/onboarding"].some(
+  const isFocusedFlow = ["/logga-in", "/skapa-konto", "/glomt-losenord", "/aterstall-losenord", "/onboarding", "/inbjudan"].some(
     (path) => pathname.startsWith(path),
   );
 

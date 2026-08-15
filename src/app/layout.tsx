@@ -23,11 +23,13 @@ export const metadata: Metadata = {
     siteName: brand.name,
     title: brand.name,
     description: brand.description,
+    images: [{ url: "/brand/open-graph.png", width: 1200, height: 630, alt: `${brand.name} – ${brand.description}` }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: brand.name,
     description: brand.description,
+    images: ["/brand/open-graph.png"],
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -36,8 +38,12 @@ export const metadata: Metadata = {
     title: brand.shortName,
   },
   icons: {
-    icon: "/brand/app-icon-192-placeholder.svg",
-    apple: "/brand/app-icon-192-placeholder.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
