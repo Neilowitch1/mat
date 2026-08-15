@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
@@ -36,6 +36,11 @@ export default function ListSearchSheet({
 }: ListSearchSheetProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [mobileViewport, setMobileViewport] = useState<{
+    height: number;
+    offsetTop: number;
+  } | null>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase("sv");
   const results = useMemo(
     () =>
@@ -58,19 +63,67 @@ export default function ListSearchSheet({
     [open]
   );
 
+  useEffect(() => {
+    if (!open || !isInputFocused) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      setMobileViewport(
+        mediaQuery.matches
+          ? {
+              height: viewport?.height ?? window.innerHeight,
+              offsetTop: viewport?.offsetTop ?? 0,
+            }
+          : null
+      );
+    };
+
+    const initialUpdate = requestAnimationFrame(updateViewport);
+    viewport?.addEventListener("resize", updateViewport);
+    viewport?.addEventListener("scroll", updateViewport);
+    window.addEventListener("resize", updateViewport);
+    mediaQuery.addEventListener("change", updateViewport);
+
+    return () => {
+      cancelAnimationFrame(initialUpdate);
+      viewport?.removeEventListener("resize", updateViewport);
+      viewport?.removeEventListener("scroll", updateViewport);
+      window.removeEventListener("resize", updateViewport);
+      mediaQuery.removeEventListener("change", updateViewport);
+    };
+  }, [isInputFocused, open]);
+
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
-    if (!nextOpen) setQuery("");
+    if (!nextOpen) {
+      setQuery("");
+      setIsInputFocused(false);
+    }
   }
 
   function handleSelect(item: ListSearchItem) {
     handleOpenChange(false);
-    window.setTimeout(() => onSelect(item), 200);
+    onSelect(item);
   }
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="mx-auto max-h-[82dvh] max-w-md px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <SheetContent
+        side="bottom"
+        style={
+          mobileViewport
+            ? {
+                top: `calc(${mobileViewport.offsetTop}px + env(safe-area-inset-top) + 0.75rem)`,
+                bottom: "auto",
+                maxHeight: `calc(${mobileViewport.height}px - env(safe-area-inset-top) - 1.5rem)`,
+              }
+            : undefined
+        }
+        className="mx-auto max-h-[82dvh] max-w-md px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+      >
         <SheetHeader className="px-0 pb-1 pt-4">
           <SheetTitle className="text-lg text-primary">{title}</SheetTitle>
           <SheetDescription>Sökningen gäller bara innehållet i den här listan.</SheetDescription>
@@ -84,6 +137,11 @@ export default function ListSearchSheet({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => {
+              setIsInputFocused(false);
+              setMobileViewport(null);
+            }}
             placeholder={placeholder}
             aria-label={placeholder}
             autoComplete="off"

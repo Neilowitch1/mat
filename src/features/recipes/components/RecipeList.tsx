@@ -10,6 +10,7 @@ import { openSearchSheetEvent } from "@/components/SearchSheetLink";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import { Button } from "@/components/ui/button";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { useCenteredListItem } from "@/hooks/useCenteredListItem";
 import { getInventory } from "@/services/inventory.service";
 import type { InventoryItem, Product, Recipe, RecipeCategory } from "@/types/database";
 import { rankRecipeSuggestions } from "../recipeAvailability";
@@ -28,6 +29,7 @@ function formatIngredientCount(count: number): string {
 }
 
 export default function RecipeList({ initialRecipes, initialInventoryItems, products }: RecipeListProps) {
+  const centerRecipe = useCenteredListItem("recipe-");
   const [recipes, setRecipes] = useState(initialRecipes);
   const [inventoryItems, setInventoryItems] = useState(initialInventoryItems);
   const [activeTab, setActiveTab] = useState<"mine" | "baking" | "find">("mine");
@@ -80,11 +82,7 @@ export default function RecipeList({ initialRecipes, initialInventoryItems, prod
   }
 
   function focusRecipe(id: string) {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const recipe = document.getElementById(`recipe-${id}`);
-      recipe?.scrollIntoView({ behavior: "smooth", block: "center" });
-      recipe?.focus({ preventScroll: true });
-    }));
+    centerRecipe(id);
   }
 
   return (

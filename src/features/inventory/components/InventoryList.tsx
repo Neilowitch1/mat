@@ -20,6 +20,7 @@ import ScrollToTopButton from "@/components/ScrollToTopButton";
 
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { useInventoryCategories } from "@/hooks/useInventoryCategories";
+import { useCenteredListItem } from "@/hooks/useCenteredListItem";
 
 import {
   classifyInventoryExpiration,
@@ -449,6 +450,7 @@ export default function InventoryList({
   initialInventoryCategories,
   initialShoppingProductIds,
 }: InventoryListProps) {
+  const centerInventoryItem = useCenteredListItem("inventory-item-");
   const { categories, selectableCategories } = useInventoryCategories(
     [],
     initialInventoryCategories,
@@ -592,20 +594,7 @@ export default function InventoryList({
     setStatusFilter("all");
     setExpirationFilters([]);
 
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const row = document.getElementById(
-        `inventory-item-${id}`
-      );
-
-      row?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-
-      row?.focus({
-        preventScroll: true,
-      });
-    }));
+    centerInventoryItem(id);
   }
 
   useRealtimeTable("inventory", async (change) => {

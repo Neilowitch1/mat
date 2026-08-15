@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/sheet";
 
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { useCenteredListItem } from "@/hooks/useCenteredListItem";
 
 import {
   clearShoppingList,
@@ -41,6 +42,7 @@ interface ShoppingListProps {
 export default function ShoppingList({
   initialShoppingItems,
 }: ShoppingListProps) {
+  const centerShoppingItem = useCenteredListItem("shopping-item-");
   const [shoppingItems, setShoppingItems] =
     useState(initialShoppingItems);
 
@@ -111,20 +113,7 @@ export default function ShoppingList({
   }, [router, searchParams]);
 
   function focusShoppingItem(id: string) {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const row = document.getElementById(
-        `shopping-item-${id}`
-      );
-
-      row?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-
-      row?.focus({
-        preventScroll: true,
-      });
-    }));
+    centerShoppingItem(id);
   }
 
   useRealtimeTable(
