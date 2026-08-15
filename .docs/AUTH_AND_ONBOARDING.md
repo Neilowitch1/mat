@@ -88,6 +88,14 @@ If onboarding already created another household, the SQL above safely changes th
 7. Account: log out from Settings and confirm anonymous legacy mode still works during transition.
 8. Legacy link: perform the SQL procedure above and confirm old data and realtime remain intact.
 
+### Password recovery routing
+
+- Password recovery sends users to `/auth/callback?flow=recovery&next=/aterstall-losenord`.
+- The callback exchanges the one-time PKCE code for a cookie-backed session and marks the short-lived recovery flow with an HttpOnly, same-site cookie.
+- `/aterstall-losenord` only renders the password form when both the recovery marker and a valid session are present. Invalid, expired, and reused links offer a new recovery email.
+- A successful password update clears the recovery marker, signs out the local session, and returns the user to login. Verify that the old password fails and the new password succeeds.
+- Supabase Dashboard only needs the callback origins already listed above. Query parameters do not require separate Redirect URL entries.
+
 ## Step 3 household management
 
 - `20260811110000_household_management_and_invitations.sql` adds protected membership RPCs and invitation storage. Apply it manually after the two foundation migrations; the app does not run migrations.
