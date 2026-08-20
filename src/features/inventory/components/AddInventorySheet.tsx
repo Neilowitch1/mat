@@ -34,6 +34,7 @@ import {
 } from "@/lib/unitConversion";
 
 import {
+  getProductByBarcode,
   getOrCreateProduct,
   searchProducts,
 } from "@/services/products.service";
@@ -46,6 +47,7 @@ import type {
 } from "@/types/database";
 
 import InventoryUnitField from "./InventoryUnitField";
+import BarcodeScanner from "./BarcodeScanner";
 
 import {
   getInventoryCategoryOptions,
@@ -61,6 +63,7 @@ type ProductSelection =
   | {
       kind: "new";
       name: string;
+      barcode?: string;
     };
 
 type SearchResult = {
@@ -224,6 +227,9 @@ export default function AddInventorySheet({
     errorMessage,
     setErrorMessage,
   ] = useState<string | null>(null);
+
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
 
   const sheetOpen =
     controlledOpen ?? isOpen;
@@ -469,6 +475,8 @@ export default function AddInventorySheet({
     setQuery("");
     setSearchResult(null);
     setSelection(null);
+    setScannedBarcode(null);
+    setIsLookingUpBarcode(false);
 
     setLocation(inventoryLocations.find((category) => category.value === "pantry")?.value ?? inventoryLocations[0]?.value ?? "pantry");
     setStatus("full");
@@ -492,6 +500,8 @@ export default function AddInventorySheet({
   function selectExistingProduct(
     product: Product
   ) {
+    setScannedBarcode(null);
+
     const defaultUnit =
       normalizeStoredUnit(
         product.default_unit ||
@@ -522,9 +532,35 @@ export default function AddInventorySheet({
     setSelection({
       kind: "new",
       name: trimmedQuery,
+      barcode: scannedBarcode ?? undefined,
     });
 
     setErrorMessage(null);
+  }
+
+  async function handleBarcodeDetected(barcode: string) {
+    setIsLookingUpBarcode(true);
+    setErrorMessage(null);
+
+    try {
+      const product = await getProductByBarcode(barcode);
+
+      if (product) {
+        setScannedBarcode(null);
+        selectExistingProduct(product);
+        return;
+      }
+
+      setSelection(null);
+      setQuery("");
+      setScannedBarcode(barcode);
+      setErrorMessage("Ingen produkt har den här streckkoden ännu. Skriv ett produktnamn och skapa den.");
+      window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    } catch {
+      setErrorMessage("Kunde inte slå upp streckkoden. Försök igen.");
+    } finally {
+      setIsLookingUpBarcode(false);
+    }
   }
 
   async function handleSubmit(
@@ -573,7 +609,8 @@ export default function AddInventorySheet({
         "existing"
           ? selection.product
           : await getOrCreateProduct(
-              selection.name
+              selection.name,
+              selection.barcode
             );
 
       const input = {
@@ -744,7 +781,7 @@ export default function AddInventorySheet({
               </div>
             </div>
           ) : (
-            <div className="relative">
+            <div>
               <label
                 htmlFor="inventory-product"
                 className="mb-2 block text-sm font-medium"
@@ -752,38 +789,30 @@ export default function AddInventorySheet({
                 Produkt
               </label>
 
-              <Search
-                aria-hidden="true"
-                size={18}
-                className="absolute bottom-3 left-3 text-muted-foreground"
-              />
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search aria-hidden="true" size={18} className="absolute bottom-3 left-3 text-muted-foreground" />
+                  <Input
+                    ref={searchInputRef}
+                    id="inventory-product"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setSelection(null);
+                      setErrorMessage(null);
+                    }}
+                    placeholder={scannedBarcode ? "Namnge den skannade produkten" : "Lägg till produkt"}
+                    autoComplete="off"
+                    className="pl-10"
+                  />
+                </div>
 
-              <Input
-                ref={
-                  searchInputRef
-                }
-                id="inventory-product"
-                value={query}
-                onChange={(
-                  event
-                ) => {
-                  setQuery(
-                    event.target
-                      .value
-                  );
+                <BarcodeScanner disabled={isSubmitting || isLookingUpBarcode} onDetected={handleBarcodeDetected} />
+              </div>
 
-                  setSelection(
-                    null
-                  );
-
-                  setErrorMessage(
-                    null
-                  );
-                }}
-                placeholder="Lägg till produkt"
-                autoComplete="off"
-                className="pl-10"
-              />
+              {scannedBarcode && (
+                <p className="mt-2 text-xs text-muted-foreground">Skannad kod: {scannedBarcode}</p>
+              )}
             </div>
           )}
 

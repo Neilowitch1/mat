@@ -119,7 +119,7 @@ export async function getActiveHouseholdRecipes(
         id, household_id, name, description, instructions, servings,
         prep_time_minutes, image_url, favorite, category, created_at, updated_at,
         ingredients:recipe_ingredients(
-          id, recipe_id, product_id, amount, unit, created_at
+          id, recipe_id, product_id, amount, unit, sort_order, created_at
         )
       )
     `,
@@ -128,6 +128,11 @@ export async function getActiveHouseholdRecipes(
   return {
     activeHouseholdId: profile?.active_household_id ?? null,
     inventory: oldestFirst(profile?.active_household?.inventory ?? []),
-    recipes: newestFirst(profile?.active_household?.recipes ?? []),
+    recipes: newestFirst(profile?.active_household?.recipes ?? []).map((recipe) => ({
+      ...recipe,
+      ingredients: recipe.ingredients
+        ? [...recipe.ingredients].sort((left, right) => left.sort_order - right.sort_order || left.created_at.localeCompare(right.created_at))
+        : undefined,
+    })),
   };
 }

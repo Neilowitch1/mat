@@ -133,7 +133,7 @@ export default function CreateRecipeSheet({ open, onOpenChange, onRecipeCreated,
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setIngredients((current) => [...current, { key: crypto.randomUUID(), product: null, amount: "", unit: "" }])}
+                  onClick={() => setIngredients((current) => [{ key: crypto.randomUUID(), product: null, amount: "", unit: "" }, ...current])}
                   className="rounded-full text-primary"
                 >
                   <Plus aria-hidden="true" />

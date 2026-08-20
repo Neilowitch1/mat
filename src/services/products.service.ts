@@ -62,11 +62,30 @@ export async function getProducts(client = supabase): Promise<Product[]> {
   return data ?? [];
 }
 
-export async function createProduct(name: string): Promise<Product> {
-  const normalizedName = normalizeProductDisplayName(name);
+function normalizeBarcode(barcode: string): string {
+  return barcode.replace(/\D/g, "");
+}
+
+export async function getProductByBarcode(barcode: string): Promise<Product | null> {
+  const normalizedBarcode = normalizeBarcode(barcode);
+  if (!normalizedBarcode) return null;
+
   const { data, error } = await supabase
     .from("products")
-    .insert({ name: normalizedName })
+    .select("*")
+    .eq("barcode", normalizedBarcode)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createProduct(name: string, barcode?: string): Promise<Product> {
+  const normalizedName = normalizeProductDisplayName(name);
+  const normalizedBarcode = barcode ? normalizeBarcode(barcode) : null;
+  const { data, error } = await supabase
+    .from("products")
+    .insert({ name: normalizedName, barcode: normalizedBarcode })
     .select()
     .single();
 
@@ -77,8 +96,14 @@ export async function createProduct(name: string): Promise<Product> {
   return data;
 }
 
-export async function getOrCreateProduct(name: string): Promise<Product> {
+export async function getOrCreateProduct(name: string, barcode?: string): Promise<Product> {
   const normalizedName = normalizeProductDisplayName(name);
+  const normalizedBarcode = barcode ? normalizeBarcode(barcode) : null;
+
+  if (normalizedBarcode) {
+    const barcodeProduct = await getProductByBarcode(normalizedBarcode);
+    if (barcodeProduct) return barcodeProduct;
+  }
   const { data: existingProduct, error: readError } = await supabase
     .from("products")
     .select("*")
@@ -87,10 +112,29 @@ export async function getOrCreateProduct(name: string): Promise<Product> {
     .maybeSingle();
 
   if (readError) throw readError;
-  if (existingProduct) return existingProduct;
+  if (existingProduct) {
+    if (!normalizedBarcode || existingProduct.barcode === normalizedBarcode) {
+      return existingProduct;
+    }
+
+    if (existingProduct.barcode) {
+      throw new Error("Produkten har redan en annan streckkod.");
+    }
+
+    const { data: updatedProduct, error: updateError } = await supabase
+      .from("products")
+      .update({ barcode: normalizedBarcode })
+      .eq("id", existingProduct.id)
+      .is("barcode", null)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+    return updatedProduct;
+  }
 
   try {
-    return await createProduct(normalizedName);
+    return await createProduct(normalizedName, normalizedBarcode ?? undefined);
   } catch (error) {
     const { data: concurrentProduct } = await supabase
       .from("products")

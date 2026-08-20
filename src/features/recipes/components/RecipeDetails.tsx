@@ -583,26 +583,26 @@ function confirmPendingNavigation() {
               );
             }
           }}
-        />
+        >
+          <AppCard className="p-4">
+            <h2 className="text-base font-semibold text-primary">
+              Instruktioner
+            </h2>
 
-        <AppCard className="p-4">
-          <h2 className="text-base font-semibold text-primary">
-            Instruktioner
-          </h2>
-
-          {recipe.instructions ? (
-            <p className="mt-2.5 max-w-prose whitespace-pre-wrap text-[0.9375rem] leading-7 text-foreground">
-              {
-                recipe.instructions
-              }
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-muted-foreground">
-              Inga instruktioner
-              har lagts till ännu.
-            </p>
-          )}
-        </AppCard>
+            {recipe.instructions ? (
+              <p className="mt-2.5 max-w-prose whitespace-pre-wrap text-[0.9375rem] leading-7 text-foreground">
+                {
+                  recipe.instructions
+                }
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Inga instruktioner
+                har lagts till ännu.
+              </p>
+            )}
+          </AppCard>
+        </RecipeIngredientsSection>
 
         {hasUnsavedChanges &&
           !isSavingRecipe && (

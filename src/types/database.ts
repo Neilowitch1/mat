@@ -56,6 +56,7 @@ export interface Product {
   name: string;
   category: string | null;
   default_unit: string | null;
+  barcode: string | null;
   created_at: string;
 }
 
@@ -108,6 +109,7 @@ export interface RecipeIngredient {
   product_id: string;
   amount: string | null;
   unit: string | null;
+  sort_order: number;
   created_at: string;
 
   product?: Product;

@@ -6,6 +6,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  type ReactNode,
   type Ref,
   useState,
 } from "react";
@@ -36,6 +37,7 @@ interface RecipeIngredientsSectionProps {
   onDirtyChange?: (
     hasUnsavedChanges: boolean
   ) => void;
+  children?: ReactNode;
 }
 
 type ShoppingFeedback =
@@ -49,6 +51,7 @@ export default function RecipeIngredientsSection({
   inventoryItems,
   editorRef,
   onDirtyChange,
+  children,
 }: RecipeIngredientsSectionProps) {
   const [
     ingredients,
@@ -300,6 +303,8 @@ export default function RecipeIngredientsSection({
           )}
         </section>
       </AppCard>
+
+      {children}
 
       <AppCard className="p-4">
         <RecipeIngredientEditor

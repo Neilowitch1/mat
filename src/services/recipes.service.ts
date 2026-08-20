@@ -25,6 +25,12 @@ export interface RecipeIngredientInput {
   unit: string | null;
 }
 
+function sortIngredients(ingredients: RecipeIngredient[] | undefined): RecipeIngredient[] | undefined {
+  return ingredients
+    ? [...ingredients].sort((left, right) => left.sort_order - right.sort_order || left.created_at.localeCompare(right.created_at))
+    : undefined;
+}
+
 async function updateIngredientDefaultUnits(
   ingredients: RecipeIngredientInput[]
 ): Promise<void> {
@@ -50,7 +56,10 @@ export async function getRecipes(client = supabase, activeHouseholdId?: string):
 
   if (error) throw error;
 
-  return data ?? [];
+  return (data ?? []).map((recipe) => ({
+    ...recipe,
+    ingredients: sortIngredients(recipe.ingredients),
+  }));
 }
 
 export async function getRecipe(id: string, client = supabase, activeHouseholdId?: string): Promise<Recipe | null> {
@@ -70,7 +79,9 @@ export async function getRecipe(id: string, client = supabase, activeHouseholdId
 
   if (error) throw error;
 
-  return data;
+  return data
+    ? { ...data, ingredients: sortIngredients(data.ingredients) }
+    : null;
 }
 
 export async function createRecipe({
@@ -114,11 +125,12 @@ export async function createRecipeWithIngredients(
   try {
     if (ingredients.length > 0) {
       const { error } = await supabase.from("recipe_ingredients").insert(
-        ingredients.map((ingredient) => ({
+        ingredients.map((ingredient, index) => ({
           recipe_id: recipe.id,
           product_id: ingredient.productId,
           amount: ingredient.amount,
           unit: ingredient.unit,
+          sort_order: index,
         }))
       );
 
@@ -143,6 +155,16 @@ export async function addRecipeIngredient(
   recipeId: string,
   input: RecipeIngredientInput
 ): Promise<RecipeIngredient> {
+  const { data: firstIngredient, error: orderError } = await supabase
+    .from("recipe_ingredients")
+    .select("sort_order")
+    .eq("recipe_id", recipeId)
+    .order("sort_order")
+    .limit(1)
+    .maybeSingle();
+
+  if (orderError) throw orderError;
+
   const { data, error } = await supabase
     .from("recipe_ingredients")
     .insert({
@@ -150,6 +172,7 @@ export async function addRecipeIngredient(
       product_id: input.productId,
       amount: input.amount,
       unit: input.unit,
+      sort_order: (firstIngredient?.sort_order ?? 1) - 1,
     })
     .select("*, product:products(*)")
     .single();
@@ -236,7 +259,7 @@ export async function saveRecipeIngredients(
   const { data: previousIngredients, error: readError } =
     await supabase
       .from("recipe_ingredients")
-      .select("product_id, amount, unit")
+      .select("product_id, amount, unit, sort_order")
       .eq("recipe_id", recipeId);
 
   if (readError) throw readError;
@@ -275,11 +298,12 @@ export async function saveRecipeIngredients(
       await supabase
         .from("recipe_ingredients")
         .insert(
-          ingredients.map((ingredient) => ({
+          ingredients.map((ingredient, index) => ({
             recipe_id: recipeId,
             product_id: ingredient.productId,
             amount: ingredient.amount,
             unit: ingredient.unit,
+            sort_order: index,
           }))
         )
         .select(`
@@ -329,6 +353,7 @@ export async function saveRecipeIngredients(
             product_id: ingredient.product_id,
             amount: ingredient.amount,
             unit: ingredient.unit,
+            sort_order: ingredient.sort_order,
           }))
         );
 
