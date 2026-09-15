@@ -1,0 +1,45 @@
+.dialog {
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+.visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 290px;
+  border-radius: 22px;
+  padding: 18px;
+  margin-top: 8px;
+  background: linear-gradient(145deg, var(--accent), var(--secondary));
+}
+
+.scanner { position: relative; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .scanner::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: var(--primary);
+    animation: scan 1.8s ease-in-out 2;
+  }
+  .transfer { animation: transfer 1.8s ease-in-out 2; }
+  .status { animation: status 1.2s ease-in-out; }
+  .check { animation: check 1s ease-out; }
+}
+
+@keyframes scan { 0%, 100% { transform: translateY(0); opacity: 0; } 30%, 70% { opacity: 1; } 80% { transform: translateY(24px); } }
+@keyframes transfer { 50% { opacity: .4; transform: translateY(3px); } }
+@keyframes status { 15%, 85% { background: var(--primary); color: var(--primary-foreground); } }
+@keyframes check { from { transform: scale(.75); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog *, .dialog *::before, .dialog *::after { animation: none !important; transition: none !important; }
+}
+
+@media (max-height: 650px) {
+  .visual { min-height: 220px; padding: 12px; }
+}

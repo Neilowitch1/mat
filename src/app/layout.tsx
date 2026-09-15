@@ -4,6 +4,7 @@ import "./globals.css";
 
 import AppLayout from "@/components/AppLayout";
 import { appUrl, brand } from "@/config/brand";
+import { getAuthState } from "@/lib/auth";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -51,15 +52,16 @@ export const viewport = {
   themeColor: brand.themeColor,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const authState = await getAuthState();
   return (
     <html lang="sv">
       <body className="font-sans">
-        <AppLayout>{children}</AppLayout>
+        <AppLayout authState={authState}>{children}</AppLayout>
       </body>
     </html>
   );

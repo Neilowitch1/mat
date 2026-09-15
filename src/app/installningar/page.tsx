@@ -14,6 +14,7 @@ import HouseholdSettings from "@/features/auth/HouseholdSettings";
 import InventoryCategorySettings from "@/features/auth/InventoryCategorySettings";
 import SignOutButton from "@/features/auth/SignOutButton";
 import { requireOnboardedUser } from "@/lib/auth";
+import { ReplayIntroduction } from "@/features/introduction/IntroductionProvider";
 
 function SectionHeading({
   id,
@@ -64,6 +65,7 @@ export default async function InstallningarPage() {
           <SectionHeading id="app-heading" title="App" description="Anpassa hur Kökshyllan fungerar för dig" />
           <div className="space-y-3">
             <InventoryCategorySettings />
+            <ReplayIntroduction />
           <AppCard className="p-0">
             <div className="flex min-h-16 items-center gap-3.5 px-4 py-3.5" aria-disabled="true">
               <span className="flex size-11 shrink-0 items-center justify-center rounded-[17px] bg-secondary text-primary">
