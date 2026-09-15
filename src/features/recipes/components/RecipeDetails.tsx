@@ -559,6 +559,10 @@ function confirmPendingNavigation() {
         </AppCard>
 
         <RecipeIngredientsSection
+          onNavigate={(url) => {
+            if (hasUnsavedChanges) setPendingNavigationUrl(url);
+            else router.push(url, { scroll: false });
+          }}
           recipeId={recipe.id}
           initialIngredients={
             recipe.ingredients ??

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, PackageOpen, Tags } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import toast from "react-hot-toast";
 import AppCard from "@/components/AppCard";
 import ListSearchSheet from "@/components/ListSearchSheet";
 import { openSearchSheetEvent } from "@/components/SearchSheetLink";
@@ -578,10 +579,34 @@ export default function InventoryList({
     };
   }, []);
 
+  useEffect(() => {
+    const id = searchParams.get("inventory");
+    if (!id) return;
+    queueMicrotask(() => {
+      const item = inventoryItems.find((candidate) => candidate.id === id);
+      if (item) {
+        setLocationFilter("all");
+        setStatusFilter("all");
+        setExpirationFilters([]);
+        centerInventoryItem(id);
+      } else {
+        toast("Produkten finns inte längre hemma.");
+      }
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("inventory");
+      router.replace(params.size ? "/hemma?" + params : "/hemma", { scroll: false });
+    });
+  }, [centerInventoryItem, inventoryItems, router, searchParams]);
+
   function focusInventoryItem(id: string) {
     const inventoryItem = inventoryItems.find(
       (item) => item.id === id
     );
+
+    if (!inventoryItem) {
+      toast("Produkten finns inte längre hemma.");
+      return;
+    }
 
     if (
       inventoryItem &&
@@ -1326,7 +1351,7 @@ export default function InventoryList({
                               key={productGroup.key}
                               id={`inventory-item-${firstItem.id}`}
                               tabIndex={-1}
-                              className="scroll-mt-24 rounded-[24px] [contain-intrinsic-size:auto_7rem] [content-visibility:auto] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                              className="scroll-mt-24 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
                             >
                               <InventoryItemRow
                                 item={firstItem}
@@ -1369,7 +1394,7 @@ export default function InventoryList({
                         return (
                           <AppCard
                             key={productGroup.key}
-                            className="p-3.5 [contain-intrinsic-size:auto_9rem] [content-visibility:auto]"
+                            className="p-3.5"
                           >
                             <div className="mb-3 flex items-start justify-between gap-3">
                               <div className="min-w-0">

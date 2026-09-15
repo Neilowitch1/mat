@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navigationItems } from "./navigationItems";
 
 export default function BottomNavbar() {
   const pathname = usePathname();
+  const [recipePath, setRecipePath] = useState<string | null>(null);
+  useEffect(() => {
+    queueMicrotask(() => {
+      if (pathname.startsWith("/recept/")) setRecipePath(pathname);
+      else if (pathname === "/recept" || ["/logga-in", "/onboarding", "/installningar"].includes(pathname)) setRecipePath(null);
+    });
+  }, [pathname]);
 
   return (
     <nav
@@ -33,7 +41,7 @@ export default function BottomNavbar() {
         return (
           <Link
             key={href}
-            href={href}
+            href={href === "/recept" ? recipePath ?? href : href}
             prefetch
             aria-label={label}
             aria-current={active ? "page" : undefined}

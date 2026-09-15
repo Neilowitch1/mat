@@ -22,6 +22,7 @@ import {
   addInventoryItem,
   findInventoryRefillTarget,
   getInventoryItemsByProduct,
+  getLastInventoryLocation,
   getInventoryRefillPreview,
   isMergeableInventoryUnit,
   refillInventoryItem,
@@ -138,6 +139,7 @@ export default function AddInventorySheet({
         "st"
     );
 
+  const locationWasChosen = useRef(false);
   const searchInputRef =
     useRef<HTMLInputElement>(null);
 
@@ -387,12 +389,13 @@ export default function AddInventorySheet({
       }
     });
 
-    void getInventoryItemsByProduct(
-      preselectedProduct.id
-    )
-      .then((items) => {
+    locationWasChosen.current = false;
+    void Promise.all([getInventoryItemsByProduct(preselectedProduct.id), getLastInventoryLocation(preselectedProduct.id)])
+      .then(([items, lastLocation]) => {
         if (isCurrentRequest) {
           setExistingItems(items);
+          const existing = [...items].filter((item) => item.status !== "empty").sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id))[0];
+          if (!locationWasChosen.current) setLocation(existing?.location ?? lastLocation ?? "pantry");
         }
       })
       .catch(() => {
@@ -923,6 +926,7 @@ export default function AddInventorySheet({
                         : "outline"
                     }
                     onClick={() => {
+                      locationWasChosen.current = true;
                       setLocation(
                         option.value
                       );

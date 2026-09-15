@@ -882,3 +882,11 @@ export async function updateInventoryExpiration(
 
   return data;
 }
+
+export async function getLastInventoryLocation(productId: string): Promise<InventoryLocation | null> {
+  const householdId = await getActiveHouseholdId();
+  const { data, error } = await supabase.from("household_product_locations")
+    .select("location").eq("household_id", householdId).eq("product_id", productId).maybeSingle();
+  if (error) throw error;
+  return data?.location ?? null;
+}

@@ -11,6 +11,10 @@ import {
   useState,
 } from "react";
 
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { getInventoryItemsByProduct } from "@/services/inventory.service";
 import AppCard from "@/components/AppCard";
 import { Button } from "@/components/ui/button";
 
@@ -31,6 +35,7 @@ import RecipeIngredientEditor, {
 
 interface RecipeIngredientsSectionProps {
   recipeId: string;
+  onNavigate?: (url: string) => void;
   initialIngredients: RecipeIngredient[];
   inventoryItems: InventoryItem[];
   editorRef?: Ref<RecipeIngredientEditorHandle>;
@@ -47,12 +52,35 @@ type ShoppingFeedback =
 
 export default function RecipeIngredientsSection({
   recipeId,
+  onNavigate,
   initialIngredients,
   inventoryItems,
   editorRef,
   onDirtyChange,
   children,
 }: RecipeIngredientsSectionProps) {
+  const router = useRouter();
+  const [homeIngredient, setHomeIngredient] = useState<RecipeIngredient | null>(null);
+  const [isOpeningHome, setIsOpeningHome] = useState(false);
+
+  async function showIngredientAtHome() {
+    if (!homeIngredient || isOpeningHome) return;
+    setIsOpeningHome(true);
+    try {
+      const items = await getInventoryItemsByProduct(homeIngredient.product_id);
+      const target = items.filter((item) => item.status !== "empty").sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id))[0];
+      setHomeIngredient(null);
+      if (target) {
+        const url = `/hemma?inventory=${encodeURIComponent(target.id)}`;
+        if (onNavigate) onNavigate(url);
+        else router.push(url, { scroll: false });
+      }
+      else toast(`${homeIngredient.product?.name ?? "Produkten"} finns inte hemma.`);
+    } catch {
+      toast.error("Kunde inte kontrollera vad som finns hemma.");
+    } finally { setIsOpeningHome(false); }
+  }
+
   const [
     ingredients,
     setIngredients,
@@ -207,8 +235,9 @@ export default function RecipeIngredientsSection({
                       key={
                         ingredient.id
                       }
-                      className="flex min-w-0 items-center gap-2.5 py-2.5 first:pt-0 last:pb-0"
+                      className="py-2.5 first:pt-0 last:pb-0"
                     >
+                      <button type="button" onClick={() => setHomeIngredient(ingredient)} className="flex w-full min-w-0 items-center gap-2.5 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
                       <span
                         className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
                           available
@@ -250,6 +279,7 @@ export default function RecipeIngredientsSection({
                         {amount ||
                           "—"}
                       </span>
+                      </button>
                     </li>
                   );
                 }
@@ -303,6 +333,19 @@ export default function RecipeIngredientsSection({
           )}
         </section>
       </AppCard>
+
+      <Sheet open={Boolean(homeIngredient)} onOpenChange={(open) => { if (!open && !isOpeningHome) setHomeIngredient(null); }}>
+        <SheetContent side="bottom" className="mx-auto max-w-md px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+          <SheetHeader className="px-0">
+            <SheetTitle className="text-primary">Visa {homeIngredient?.product?.name ?? "produkten"} hemma?</SheetTitle>
+            <SheetDescription>Se var ingrediensen finns i Hemma.</SheetDescription>
+          </SheetHeader>
+          <SheetFooter className="grid grid-cols-2 gap-3 px-0">
+            <Button variant="outline" disabled={isOpeningHome} onClick={() => setHomeIngredient(null)}>Avbryt</Button>
+            <Button disabled={isOpeningHome} onClick={() => void showIngredientAtHome()}>{isOpeningHome ? "Kontrollerar..." : "Visa"}</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {children}
 
