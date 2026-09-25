@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
   // unconditional Auth server round trip for every navigation.
   const { data: claimsData } = await supabase.auth.getClaims();
   const claims = claimsData?.claims;
-  const privatePath = /^\/(hemma|handla|inventarie|recept|installningar|onboarding)(\/|$)/.test(request.nextUrl.pathname);
+  const privatePath = /^\/(hemma|handla|inventarie|recept|matplanering|installningar|onboarding)(\/|$)/.test(request.nextUrl.pathname);
   if (!claims && privatePath) {
     const loginUrl = new URL("/logga-in", request.url);
     loginUrl.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
@@ -41,6 +41,7 @@ export const config = {
     "/handla/:path*",
     "/inventarie/:path*",
     "/recept/:path*",
+    "/matplanering/:path*",
     "/installningar/:path*",
     "/onboarding/:path*",
   ],

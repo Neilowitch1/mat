@@ -17,7 +17,7 @@ import {
 export default function FloatingActionButton() {
   const pathname = usePathname();
 
-  if (pathname === "/hemma") return null;
+  if (pathname === "/hemma" || pathname === "/matplanering") return null;
 
   return (
     <Sheet>
